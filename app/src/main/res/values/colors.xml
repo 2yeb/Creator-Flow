@@ -2,4 +2,10 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="background">#F5FAE0</color> <!--바탕 기본 컬러-->
+    <color name="buttoncolor1">#D4EE90</color> <!--버튼 색상1-->
+    <color name="outline">#B8E060</color> <!--외각선-->
+    <color name="bottom_navigation">#8DC84A</color> <!--바텀 네비게이션 선택 색상-->
+    <color name="text_color">#313131</color> <!--텍스트 컬러-->
+    <color name="simulation_bg">#F6F6F6</color>
 </resources>

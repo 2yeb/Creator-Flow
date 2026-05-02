@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/simulation_const"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#8DC84A"
+    tools:context=".SimulationFragment">
+
+
+    <LinearLayout
+        android:id="@+id/simulation_back"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/group_2250"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/simulation_li"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/simulation_light"
+        android:orientation="horizontal"
+        android:layout_marginBottom="31dp"
+        app:layout_constraintBottom_toBottomOf="@id/simulator_anne"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/simulator_anne"
+        android:layout_width="296dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="257dp"
+        android:text="제작 시뮬레이터를 경험해 보세요"
+        android:textSize="36dp"
+        android:textStyle="bold"
+        android:textColor="#7D7D7D"
+        android:textAlignment="center"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageButton
+        android:id="@+id/business_btn"
+        android:layout_width="121dp"
+        android:layout_height="97dp"
+        android:background="@color/buttoncolor1"
+        android:contentDescription="비즈니스 모델"
+        android:src="@drawable/simulation_business"
+        android:layout_marginEnd="20dp"
+        app:layout_constraintHorizontal_chainStyle="packed"
+        app:layout_constraintEnd_toStartOf="@+id/fanart_btn"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:layout_marginTop="502dp"/>
+
+    <ImageButton
+        android:id="@+id/fanart_btn"
+        android:layout_width="121dp"
+        android:layout_height="97dp"
+        android:background="@color/buttoncolor1"
+        android:contentDescription="팬아트 모델"
+        android:src="@drawable/simulation_fanart"
+        app:layout_constraintBottom_toBottomOf="@+id/business_btn"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/business_btn"
+        app:layout_constraintTop_toTopOf="@+id/business_btn" />
+
+    <TextView
+        android:id="@+id/business_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Business"
+        android:textColor="#8DC84A"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintBottom_toTopOf="@+id/business_btn"
+        app:layout_constraintStart_toStartOf="@+id/business_btn"
+        app:layout_constraintEnd_toEndOf="@+id/business_btn"/>
+
+    <TextView
+        android:id="@+id/fanart_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Fan-art"
+        android:textColor="#8DC84A"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintBottom_toTopOf="@+id/fanart_btn"
+        app:layout_constraintStart_toStartOf="@+id/fanart_btn"
+        app:layout_constraintEnd_toEndOf="@+id/fanart_btn"/>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/simulation_chain"
+        android:layout_marginTop="11dp"
+        app:layout_constraintTop_toBottomOf="@id/business_btn"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

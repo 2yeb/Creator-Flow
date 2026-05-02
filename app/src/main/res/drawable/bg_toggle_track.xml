@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 프로젝트 변경 토글 배경 -->
+    <solid android:color="@color/outline" />
+    <corners android:radius="100dp" />
+</shape>
