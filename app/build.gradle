@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.example.android_prac'
+    namespace 'com.example.creator_flow'
     compileSdk 33
 
     defaultConfig {
-        applicationId "com.example.android_prac"
+        applicationId "com.example.creator_flow"
         minSdk 24
         targetSdk 33
         versionCode 1

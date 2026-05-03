@@ -1,4 +1,4 @@
-package com.example.android_prac;
+package com.example.creator_flow;
 
 import android.content.Context;
 

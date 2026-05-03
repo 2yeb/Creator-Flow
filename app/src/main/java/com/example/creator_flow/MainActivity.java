@@ -1,10 +1,10 @@
-package com.example.android_prac;
+package com.example.creator_flow;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
 
-import com.example.android_prac.databinding.ActivityMainBinding;
+import com.example.creator_flow.databinding.ActivityMainBinding;
 
 public class MainActivity extends AppCompatActivity {
 

@@ -1,4 +1,4 @@
-package com.example.android_prac;
+package com.example.creator_flow;
 
 import android.os.Bundle;
 
@@ -9,19 +9,17 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import com.example.android_prac.databinding.FragmentHomeBinding;
-import com.example.android_prac.databinding.FragmentSimulationBinding;
+import com.example.creator_flow.databinding.FragmentStatisticsBinding;
 
 import org.jetbrains.annotations.Nullable;
 
-public class HomeFragment extends Fragment {
-
-    FragmentHomeBinding binding;
+public class StatisticsFragment extends Fragment {
+    FragmentStatisticsBinding binding;
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        binding = FragmentHomeBinding.inflate(inflater, container, false);
+        binding = FragmentStatisticsBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
 }

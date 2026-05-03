@@ -1,4 +1,4 @@
-package com.example.android_prac;
+package com.example.creator_flow;
 
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -15,8 +15,8 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
-import com.example.android_prac.databinding.FragmentGroupListBinding;
-import com.example.android_prac.databinding.FragmentProjectBinding;
+import com.example.creator_flow.databinding.FragmentGroupListBinding;
+import com.example.creator_flow.databinding.FragmentProjectBinding;
 
 import org.jetbrains.annotations.Nullable;
 
