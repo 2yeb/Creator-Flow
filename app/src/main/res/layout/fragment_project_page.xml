@@ -1,15 +1,607 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
     tools:context=".ProjectPageFragment">
 
-    <!-- TODO: Update blank fragment layout -->
-    <TextView
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:text="@string/hello_blank_fragment" />
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="40dp"
+        android:clipToPadding="false">
 
-</FrameLayout>
+        <!-- ===== 파일 UI (초록 배경 카드 안에 폴더) ===== -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="-20dp"
+            android:layout_marginEnd="-20dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/project_page_header"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="20dp"
+            android:paddingBottom="24dp">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout
+                    android:id="@+id/folder_tab"
+                    android:layout_width="0dp"
+                    android:layout_height="35dp"
+                    android:orientation="horizontal"
+                    app:layout_constraintBottom_toTopOf="@id/folder_white"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+
+                <View
+                    android:id="@+id/folder_body_back"
+                    android:layout_width="0dp"
+                    android:layout_height="160dp"
+                    android:background="@drawable/project_rounded_solid"
+                    android:backgroundTint="@color/folder_yellow_back"
+                    app:layout_constraintBottom_toBottomOf="@id/folder_body"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+
+                <View
+                    android:id="@+id/folder_white"
+                    android:layout_width="350dp"
+                    android:layout_height="12dp"
+                    android:background="@drawable/project_file_tab"
+                    android:backgroundTint="@color/white"
+                    app:layout_constraintBottom_toTopOf="@id/folder_body"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/folder_tab" />
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:id="@+id/folder_body"
+                    android:layout_width="0dp"
+                    android:layout_height="160dp"
+                    android:background="@drawable/project_rounded_solid"
+                    android:backgroundTint="@color/folder_yellow"
+                    android:padding="16dp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/folder_white">
+
+                    <ImageView
+                        android:id="@+id/folder_photo"
+                        android:layout_width="100dp"
+                        android:layout_height="100dp"
+                        android:layout_marginStart="10dp"
+                        android:background="@drawable/project_rounded_solid"
+                        android:backgroundTint="@color/white"
+                        android:clipToOutline="true"
+                        android:contentDescription="썸네일"
+                        android:scaleType="centerCrop"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+
+                    <EditText
+                        android:id="@+id/folder_name"
+                        android:layout_width="160dp"
+                        android:layout_height="30dp"
+                        android:layout_marginStart="16dp"
+                        android:background="@drawable/outline_white"
+                        android:gravity="start|center"
+                        android:hint="프로젝트명"
+                        android:inputType="text"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="5dp"
+                        android:textColor="@color/white"
+                        android:textColorHint="#AAFFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        app:layout_constraintBottom_toTopOf="@id/folder_category"
+                        app:layout_constraintHorizontal_bias="0.0"
+                        app:layout_constraintStart_toEndOf="@id/folder_photo"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintVertical_chainStyle="packed" />
+
+                    <Spinner
+                        android:id="@+id/folder_category"
+                        android:layout_width="wrap_content"
+                        android:layout_height="30dp"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/outline_white"
+                        android:minWidth="100dp"
+                        android:padding="4dp"
+                        app:layout_constraintBottom_toTopOf="@id/folder_calendar"
+                        app:layout_constraintStart_toEndOf="@id/folder_photo"
+                        app:layout_constraintTop_toBottomOf="@id/folder_name" />
+
+                    <TextView
+                        android:id="@+id/folder_calendar"
+                        android:layout_width="wrap_content"
+                        android:layout_height="30dp"
+                        android:layout_marginStart="14dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/project_rounded_solid"
+                        android:backgroundTint="#80FFFFFF"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:paddingStart="20dp"
+                        android:paddingEnd="20dp"
+                        android:textColor="@color/white"
+                        android:textSize="14sp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toEndOf="@id/folder_photo"
+                        app:layout_constraintTop_toBottomOf="@id/folder_category" />
+
+                    <ImageButton
+                        android:id="@+id/folder_add"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:background="@drawable/project_file_add_btn"
+                        android:contentDescription="차시 추가"
+                        android:src="@drawable/ic_add"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent" />
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </FrameLayout>
+
+        <!-- ===== 세부 사항 ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:background="@drawable/project_section_icon"
+                android:contentDescription="세부사항 아이콘"
+                android:padding="6dp"
+                android:src="@drawable/project_ic_file" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="세부 사항"
+                android:textColor="@color/text_color"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 세부 사항 필드들 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="40dp"
+            android:orientation="vertical"
+            android:padding="0dp">
+
+            <!-- 단가 -->
+            <LinearLayout
+                android:layout_width="180dp"
+                android:layout_height="40dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/project_section_field"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="단가 : "
+                    android:textColor="@color/text_color"
+                    android:textSize="14sp" />
+
+                <EditText
+                    android:id="@+id/et_price"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:inputType="numberDecimal"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <!-- 수량 -->
+            <LinearLayout
+                android:layout_width="180dp"
+                android:layout_height="40dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/project_section_field"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="수량 : "
+                    android:textColor="@color/text_color"
+                    android:textSize="14sp" />
+
+                <EditText
+                    android:id="@+id/et_quantity"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:inputType="number"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <!-- 판매가 -->
+            <LinearLayout
+                android:layout_width="180dp"
+                android:layout_height="40dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/project_section_field"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="판매가 : "
+                    android:textColor="@color/text_color"
+                    android:textSize="14sp" />
+
+                <EditText
+                    android:id="@+id/et_retail_price"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:inputType="numberDecimal"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <!-- 제작 업체 -->
+            <LinearLayout
+                android:layout_width="180dp"
+                android:layout_height="40dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/project_section_field"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="제작 업체 : "
+                    android:textColor="@color/text_color"
+                    android:textSize="14sp" />
+
+                <EditText
+                    android:id="@+id/et_manufacturer"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <!-- 판매 업체 -->
+            <LinearLayout
+                android:layout_width="180dp"
+                android:layout_height="40dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/project_section_field"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="판매 업체 : "
+                    android:textColor="@color/text_color"
+                    android:textSize="14sp" />
+
+                <EditText
+                    android:id="@+id/et_seller"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <!-- 판매 수수료 -->
+            <LinearLayout
+                android:layout_width="180dp"
+                android:layout_height="40dp"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/project_section_field"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="판매 수수료 : "
+                    android:textColor="@color/text_color"
+                    android:textSize="14sp" />
+
+                <EditText
+                    android:id="@+id/et_commission"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:inputType="numberDecimal"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- ===== 사진 ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:background="@drawable/project_section_icon"
+                android:backgroundTint="#FF8080"
+                android:padding="6dp"
+                android:src="@drawable/project_ic_photo" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="사진"
+                android:textColor="@color/text_color"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="  도안/샘플 사진을 추가하세요"
+                android:textColor="#AAAAAA"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- 사진 추가 박스: 사진/+버튼이 프로그래밍으로 추가됨 -->
+        <LinearLayout
+            android:id="@+id/photo_add_box"
+            android:layout_width="match_parent"
+            android:layout_height="160dp"
+            android:layout_marginStart="35dp"
+            android:layout_marginEnd="24dp"
+            android:background="@drawable/photo_add_box"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="16dp" />
+
+        <!-- ===== 그래프 ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:background="@drawable/project_section_icon"
+                android:backgroundTint="#7BB4E5"
+                android:padding="6dp"
+                android:src="@drawable/project_ic_graph" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="그래프"
+                android:textColor="@color/text_color"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 차수별 단가 라벨 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="26dp"
+            android:layout_marginBottom="6dp"
+            android:text="차수별 단가"
+            android:textColor="@color/text_color"
+            android:textSize="14sp" />
+
+        <!-- 차수별 단가 카드 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="35dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/project_chart"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <com.github.mikephil.charting.charts.LineChart
+                android:id="@+id/chart_unit_price"
+                android:layout_width="match_parent"
+                android:layout_height="160dp" />
+        </LinearLayout>
+
+        <!-- 수익 구조 라벨 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="26dp"
+            android:layout_marginBottom="6dp"
+            android:text="수익 구조"
+            android:textColor="@color/text_color"
+            android:textSize="14sp" />
+
+        <!-- 수익 구조 카드 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="35dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/project_chart"
+            android:minHeight="100dp"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <com.github.mikephil.charting.charts.PieChart
+                android:id="@+id/chart_profit_structure"
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- 목표 판매량 라벨 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="26dp"
+            android:layout_marginBottom="6dp"
+            android:text="목표 판매량"
+            android:textColor="@color/text_color"
+            android:textSize="14sp" />
+
+        <!-- 목표 판매량 카드 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="35dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="24dp"
+            android:background="@drawable/project_chart"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- 프로그레스바 + % -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ProgressBar
+                    android:id="@+id/progress_sales"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="0dp"
+                    android:layout_height="14dp"
+                    android:layout_weight="1"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressBackgroundTint="#E0E0E0"
+                    android:progressTint="@color/project_page_graph" />
+
+                <TextView
+                    android:id="@+id/tv_sales_percent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="0%"
+                    android:textColor="@color/project_page_graph"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- X개 / Y개 인라인 EditText -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/et_sold_quantity"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@null"
+                    android:hint="0"
+                    android:inputType="number"
+                    android:minWidth="12dp"
+                    android:padding="0dp"
+                    android:textColor="#888888"
+                    android:textColorHint="#CCCCCC"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="개 / "
+                    android:textColor="#888888"
+                    android:textSize="12sp" />
+
+                <EditText
+                    android:id="@+id/et_target_quantity"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@null"
+                    android:hint="0"
+                    android:inputType="number"
+                    android:minWidth="12dp"
+                    android:padding="0dp"
+                    android:textColor="#888888"
+                    android:textColorHint="#CCCCCC"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="개"
+                    android:textColor="#888888"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- ===== 파일 삭제 버튼 ===== -->
+        <Button
+            android:id="@+id/btn_delete_file"
+            android:layout_width="120dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center_horizontal"
+            app:backgroundTint="#FF6B6B"
+            android:text="파일 삭제"
+            android:gravity="center"
+            android:textAlignment="center"
+            android:textColor="@color/white"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+</ScrollView>

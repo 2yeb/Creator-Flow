@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/card_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/platform_card_bg"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:clickable="true"
+    android:focusable="true"
+    android:padding="10dp">
+
+    <!-- 로고 박스 (흰색) -->
+    <FrameLayout
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/platform_logo_box">
+
+        <TextView
+            android:id="@+id/tv_logo_letter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="W"
+            android:textColor="#000000"
+            android:textSize="30sp"
+            android:textStyle="bold|italic" />
+    </FrameLayout>
+
+    <!-- 플랫폼 이름 -->
+    <TextView
+        android:id="@+id/tv_platform_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="이름"
+        android:textColor="@color/text_color"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <!-- 수수료: 정적 TextView 또는 직접 입력 EditText -->
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp">
+
+        <TextView
+            android:id="@+id/tv_fee"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="5%"
+            android:textColor="@color/text_color"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:id="@+id/fee_input_row"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <EditText
+                android:id="@+id/et_fee"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:hint="0"
+                android:textColorHint="@color/text_color"
+                android:textColor="@color/text_color"
+                android:textSize="13sp"
+                android:inputType="number"
+                android:maxLength="3"
+                android:background="@null"
+                android:padding="0dp"
+                android:minWidth="16dp"
+                android:gravity="end"
+                android:autofillHints="fee" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="%"
+                android:textColor="@color/text_color"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </FrameLayout>
+
+</LinearLayout>

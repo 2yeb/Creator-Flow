@@ -1,6 +1,7 @@
 package com.example.creator_flow;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
 
 import android.os.Bundle;
 
@@ -18,6 +19,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 콘텐츠가 status bar 영역까지 그려지도록 (edge-to-edge)
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());

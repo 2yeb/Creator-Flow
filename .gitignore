@@ -13,3 +13,13 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Claude Code working dir
+.claude/
+
+# IDE config files (noise, not real code changes)
+/.idea/.name
+/.idea/compiler.xml
+/.idea/deploymentTargetSelector.xml
+/.idea/gradle.xml
+/.idea/misc.xml

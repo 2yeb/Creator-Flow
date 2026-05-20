@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/vendor_card_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/rounded_solid"
+    android:backgroundTint="@color/background"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:layout_marginBottom="8dp">
+
+        <View
+            android:id="@+id/vendor_color_box"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/rounded_solid"
+            android:backgroundTint="#1A237E" />
+
+        <TextView
+            android:id="@+id/tv_vendor_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="업체"
+            android:textColor="@color/text_color"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tv_vendor_price"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:text="₩ 0"
+        android:textColor="#3A6E00"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tv_vendor_spec"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#555555"
+        android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/tv_vendor_ship"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="배송 ₩0"
+        android:textColor="#555555"
+        android:textSize="11sp" />
+
+</LinearLayout>
