@@ -74,6 +74,18 @@ public class ProjectFragment extends Fragment {
                 replaceChildFragment(new GroupListFragment());
             }
         });
+
+        // 프로젝트 페이지 이동 버튼
+        view.findViewById(R.id.btn_open_project_page).setOnClickListener(v -> {
+            // TODO: 프로젝트 목록에서 선택한 실제 project ID를 전달하세요
+            String selectedProjectId = null; // 예: "uuid-from-project-list"
+            getParentFragmentManager().beginTransaction()
+                    .replace(R.id.main_fragment,
+                            ProjectPageFragment.newInstance(selectedProjectId))
+                    .addToBackStack(null)
+                    .commit();
+        });
+
     }
 
     // 애니메이션 처리를 위한 별도 메소드

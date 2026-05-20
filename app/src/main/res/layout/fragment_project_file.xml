@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@android:color/transparent"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="24dp"
+    android:paddingBottom="24dp">
+
+<!-- 이 파일 안 씀 -->
+    <!-- ① folder_body_back: 폴더 뒷배경 (그림자) -->
+    <View
+        android:id="@+id/folder_body_back"
+        android:layout_width="0dp"
+        android:layout_height="180dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/project_rounded_solid"
+        android:backgroundTint="@color/folder_yellow_back"
+        app:layout_constraintBottom_toBottomOf="@id/folder_body"
+        app:layout_constraintEnd_toEndOf="@id/folder_body"
+        app:layout_constraintStart_toStartOf="@id/folder_body" />
+
+    <!-- ② chasi_tab_background: 탭 배경 (동적 너비 - Java에서 조정) -->
+    <View
+        android:id="@+id/chasi_tab_background"
+        android:layout_width="0dp"
+        android:layout_height="35dp"
+        android:background="@drawable/project_file_tab"
+        android:backgroundTint="@color/folder_yellow_back"
+        app:layout_constraintBottom_toTopOf="@id/folder_body"
+        app:layout_constraintEnd_toEndOf="@id/folder_body"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="@id/folder_body"
+        app:layout_constraintWidth_percent="0.4" />
+
+    <!-- ③ folder_white: 폴더 상단 흰색 띠 -->
+    <View
+        android:id="@+id/folder_white"
+        android:layout_width="350dp"
+        android:layout_height="12dp"
+        android:background="@drawable/project_file_tab"
+        android:backgroundTint="@color/white"
+        app:layout_constraintBottom_toTopOf="@id/folder_body"
+        app:layout_constraintEnd_toEndOf="@id/folder_body"
+        app:layout_constraintStart_toStartOf="@id/folder_body" />
+
+    <!-- ④ chasi_tab: 차시 텍스트 (선택된 페이지에서만 VISIBLE) -->
+    <TextView
+        android:id="@+id/chasi_tab"
+        android:layout_width="70dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/project_file_tab"
+        android:gravity="center"
+        android:textColor="@color/text_color"
+        android:textSize="12sp"
+        android:visibility="visible"
+        app:layout_constraintBottom_toBottomOf="@id/chasi_tab_background"
+        app:layout_constraintEnd_toEndOf="@id/chasi_tab_background"
+        app:layout_constraintStart_toStartOf="@id/chasi_tab_background"
+        app:layout_constraintTop_toTopOf="@id/chasi_tab_background"
+        tools:text="1차시" />
+
+    <!-- ⑤ folder_body: 가장 앞 (메인 폴더 본체) -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/folder_body"
+        android:layout_width="0dp"
+        android:layout_height="160dp"
+        android:background="@drawable/project_rounded_solid"
+        android:backgroundTint="@color/folder_yellow"
+        android:padding="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <ImageView
+            android:id="@+id/folder_photo"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/project_rounded_solid"
+            android:backgroundTint="@color/white"
+            android:clipToOutline="true"
+            android:scaleType="centerCrop"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <EditText
+            android:id="@+id/folder_name"
+            android:layout_width="160dp"
+            android:layout_height="30dp"
+            android:layout_marginStart="16dp"
+            android:background="@drawable/outline_white"
+            android:gravity="start|center"
+            android:hint="프로젝트명"
+            android:inputType="text"
+            android:paddingStart="10dp"
+            android:paddingEnd="5dp"
+            android:textColor="@color/text_color"
+            android:textColorHint="#AAFFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toTopOf="@id/folder_category"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintStart_toEndOf="@id/folder_photo"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_chainStyle="packed" />
+
+        <Spinner
+            android:id="@+id/folder_category"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/outline_white"
+            android:minWidth="100dp"
+            android:padding="4dp"
+            app:layout_constraintBottom_toTopOf="@id/folder_calendar"
+            app:layout_constraintStart_toEndOf="@id/folder_photo"
+            app:layout_constraintTop_toBottomOf="@id/folder_name" />
+
+        <TextView
+            android:id="@+id/folder_calendar"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/project_rounded_solid"
+            android:backgroundTint="#80FFFFFF"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@id/folder_photo"
+            app:layout_constraintTop_toBottomOf="@id/folder_category" />
+
+        <ImageButton
+            android:id="@+id/folder_add"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:background="@drawable/project_file_add_btn"
+            android:contentDescription="차시 추가"
+            android:src="@drawable/ic_add"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

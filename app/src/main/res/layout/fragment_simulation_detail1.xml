@@ -1,14 +1,330 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".SimulationDetail1Fragment">
+    android:background="@color/simulation_background">
 
-    <!-- 시뮬레이션 첫번째 화면 -->
-    <TextView
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:text="@string/hello_blank_fragment" />
+        android:layout_height="match_parent">
+
+        <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="30dp"
+        android:paddingEnd="30dp"
+        android:paddingTop="80dp"
+        android:paddingBottom="40dp">
+
+        <!-- Business Model 헤더 (Java에서 Business/Fan-art 동적 변경) -->
+        <TextView
+            android:id="@+id/tv_model_header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Business Model"
+            android:textColor="#7AB648"
+            android:textSize="14sp"
+            android:layout_marginBottom="20dp"/>
+
+        <!-- ===== 굿즈 유형 ===== -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="15dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="#FFFFFF">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="굿즈 유형"
+                    android:textColor="@color/text_color"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="14dp"/>
+
+                <Spinner
+                    android:id="@+id/spinner_goods_type"
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:background="@drawable/dropdown_goods_bg"
+                    android:entries="@array/goods_type_items"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="44dp"
+                    android:spinnerMode="dropdown"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginEnd="10dp"/>
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- ===== 세부 유형 (굿즈 유형에 따라 동적) ===== -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/card_sub_type"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="15dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="@color/white">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="세부 유형"
+                    android:textColor="@color/text_color"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="14dp"/>
+
+                <Spinner
+                    android:id="@+id/spinner_sub_type"
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:background="@drawable/dropdown_goods_bg"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="44dp"
+                    android:spinnerMode="dropdown"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginEnd="10dp"/>
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- ===== 옵션 (API 연동 - 동적 생성) ===== -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="15dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="#FFFFFF">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="옵션"
+                    android:textColor="@color/text_color"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="14dp"/>
+
+                <!-- 굿즈 유형 선택 시 Java에서 동적으로 칩 생성 -->
+                <!-- 칩 선택: rounded_solid + backgroundTint="#C8E87A" -->
+                <!-- 칩 미선택: chip_unselected drawable -->
+                <LinearLayout
+                    android:id="@+id/options_chip_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"/>
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- ===== 수량 ===== -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="15dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="#FFFFFF">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="수량"
+                    android:textColor="@color/text_color"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="14dp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <SeekBar
+                        android:id="@+id/seekbar_quantity"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="300"
+                        android:progress="10"
+                        android:progressTint="#7AB648"
+                        android:thumbTint="#7AB648"/>
+
+                    <EditText
+                        android:id="@+id/tv_quantity_value"
+                        android:layout_width="80dp"
+                        android:layout_height="wrap_content"
+                        android:text="10"
+                        android:gravity="end"
+                        android:textColor="@color/text_color"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:layout_marginStart="12dp"
+                        android:inputType="number"
+                        android:maxLength="6"
+                        android:imeOptions="actionDone"
+                        android:singleLine="true"
+                        android:background="@null"
+                        android:padding="0dp"
+                        android:autofillHints="quantity"/>
+
+                </LinearLayout>
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- ===== 배송 관리 ===== -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="15dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="#FFFFFF">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="배송 관리"
+                    android:textColor="@color/text_color"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="14dp"/>
+
+                <RadioGroup
+                    android:id="@+id/radio_group_delivery"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <RadioButton
+                        android:id="@+id/radio_direct"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="직접 배송"
+                        android:checked="true"
+                        android:buttonTint="#7AB648"
+                        android:textColor="@color/text_color"
+                        android:textSize="15sp"
+                        android:layout_marginEnd="28dp"/>
+
+                    <RadioButton
+                        android:id="@+id/radio_consignment"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="위탁 배송"
+                        android:buttonTint="#7AB648"
+                        android:textColor="@color/text_color"
+                        android:textSize="15sp"/>
+
+                </RadioGroup>
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- ===== 제작 업체 ===== -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="15dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="#FFFFFF">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="제작 업체"
+                    android:textColor="@color/text_color"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="14dp"/>
+
+                <!-- 굿즈 유형 + 옵션에 맞는 업체 카드 동적 생성 (Java) -->
+                <LinearLayout
+                    android:id="@+id/vendor_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"/>
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- 뒤로가기 (좌상단, ScrollView 위 floating) -->
+    <ImageView
+        android:id="@+id/btn_back"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginStart="16dp"
+        android:src="@drawable/ic_arrow_back"
+        android:padding="6dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="뒤로" />
+
+    <!-- 다음 화살표 (우하단, 업체 선택 후 표시) -->
+    <ImageView
+        android:id="@+id/btn_next"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="end|bottom"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="24dp"
+        android:src="@drawable/ic_arrow_right"
+        android:background="@drawable/next_button_bg"
+        android:padding="10dp"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true"
+        android:contentDescription="다음" />
 
 </FrameLayout>

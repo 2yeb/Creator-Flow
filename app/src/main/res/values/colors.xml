@@ -7,5 +7,12 @@
     <color name="outline">#B8E060</color> <!--외각선-->
     <color name="bottom_navigation">#8DC84A</color> <!--바텀 네비게이션 선택 색상-->
     <color name="text_color">#313131</color> <!--텍스트 컬러-->
-    <color name="simulation_bg">#F6F6F6</color>
+    <color name="simulation_background">#F6F6F6</color>
+    <color name="folder_yellow">#FFD97D</color> <!--폴더 기본 색상-->
+    <color name="folder_yellow_back">#FFE4A9</color> <!--폴더 뒷 배경 색상-->
+    <color name="folder_blue">#80D7FF</color> <!--폴더 파란색-->
+    <color name="folder_blue_back">#A9E4FF</color> <!--폴더 파랑 뒷 배경 색상-->
+    <color name="folder_purple">#D4B2FF</color> <!--폴더 보라색-->
+    <color name="folder_purple_back">#E3CDFF</color> <!--폴더 보라 뒷 배경 색상-->
+    <color name="project_page_graph">#7BB4E5</color> <!-- 그래프 색상 -->
 </resources>

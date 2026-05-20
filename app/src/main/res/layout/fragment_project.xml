@@ -64,4 +64,14 @@
         app:layout_constraintEnd_toEndOf="parent">
     </androidx.fragment.app.FragmentContainerView>
 
+    <Button
+        android:id="@+id/btn_open_project_page"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="프로젝트 페이지 열기"
+        android:layout_marginBottom="40dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
