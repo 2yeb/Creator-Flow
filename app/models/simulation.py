@@ -9,6 +9,8 @@ class Simulation(Base):
 
     id = Column(CHAR(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(CHAR(36), ForeignKey("user.id"), nullable=False)
+    project_id = Column(CHAR(36), ForeignKey("project.id"), nullable=True)
+    actual_quantity = Column(Integer, nullable=True)
     vendor_product_id = Column(CHAR(36), ForeignKey("vendor_product.id"), nullable=False)
     platform_plan_id = Column(CHAR(36), ForeignKey("platform_plan.id"), nullable=False)
     model_type = Column(String(50), nullable=False)
@@ -17,6 +19,7 @@ class Simulation(Base):
     shipping_fee_buyer = Column(Integer, nullable=False)
     shipping_type = Column(String(50), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    target_quantity = Column(Integer, nullable=True)
 
 
 class SimulationOption(Base):

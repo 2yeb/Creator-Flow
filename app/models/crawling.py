@@ -10,6 +10,12 @@ class GoodsType(Base):
     id = Column(CHAR(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(100), nullable=False)
 
+class GoodsDetailType(Base):
+    __tablename__ = "goods_detail_type"
+
+    id = Column(CHAR(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    goods_type_id = Column(CHAR(36), ForeignKey("goods_type.id"), nullable=False)
+    name = Column(String(100), nullable=False)
 
 class Vendor(Base):
     __tablename__ = "vendor"
@@ -27,6 +33,7 @@ class VendorProduct(Base):
     id = Column(CHAR(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     vendor_id = Column(CHAR(36), ForeignKey("vendor.id"), nullable=False)
     goods_type_id = Column(CHAR(36), ForeignKey("goods_type.id"), nullable=False)
+    goods_detail_type_id = Column(CHAR(36), ForeignKey("goods_detail_type.id"), nullable=True)
     min_quantity = Column(Integer, nullable=False)
     shipping_fee = Column(Integer, nullable=False)
     free_shipping_min = Column(Integer, nullable=True)

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.project import Project
 import uuid
+from app.models.simulation import Simulation
 
 router = APIRouter(prefix="/projects", tags=["프로젝트"])
 
@@ -21,7 +22,28 @@ def get_project(project_id: str, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다")
-    return project
+
+    # 이 프로젝트에 연결된 시뮬레이션 목록 조회 (차수별)
+    simulations = db.query(Simulation).filter(Simulation.project_id == project_id).all()
+
+    return {
+        "id": project.id,
+        "name": project.name,
+        "status": project.status,
+        "created_at": project.created_at,
+        "simulations": [
+            {
+                "id": s.id,
+                "quantity": s.quantity,
+                "selling_price": s.selling_price,
+                "model_type": s.model_type,
+                "shipping_type": s.shipping_type,
+                "target_quantity": s.target_quantity,
+                "actual_quantity": s.actual_quantity,
+                "created_at": s.created_at,
+            } for s in simulations
+        ]
+    }
 
 # 프로젝트 수정
 @router.put("/{project_id}")

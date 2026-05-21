@@ -9,7 +9,6 @@ class Project(Base):
 
     id = Column(CHAR(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(CHAR(36), ForeignKey("user.id"), nullable=False)
-    simulation_id = Column(CHAR(36), ForeignKey("simulation.id"), nullable=True)
     name = Column(String(255), nullable=False)
     status = Column(String(50), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
