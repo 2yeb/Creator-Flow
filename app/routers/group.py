@@ -2,24 +2,23 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.project import ProjectGroup, ProjectGroupMap
+from app.core.security import get_current_user_id
 import uuid
 
 router = APIRouter(tags=["그룹"])
 
-TEMP_USER_ID = "test-user-id-1234"
-
 # 내 그룹 목록 조회
 @router.get("/groups")
-def get_groups(db: Session = Depends(get_db)):
-    groups = db.query(ProjectGroup).filter(ProjectGroup.user_id == TEMP_USER_ID).all()
+def get_groups(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
+    groups = db.query(ProjectGroup).filter(ProjectGroup.user_id == user_id).all()
     return groups
 
 # 그룹 생성
 @router.post("/groups")
-def create_group(keyword: str, db: Session = Depends(get_db)):
+def create_group(keyword: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     group = ProjectGroup(
         id=str(uuid.uuid4()),
-        user_id=TEMP_USER_ID,
+        user_id=user_id,
         keyword=keyword
     )
     db.add(group)
@@ -29,7 +28,7 @@ def create_group(keyword: str, db: Session = Depends(get_db)):
 
 # 그룹 삭제
 @router.delete("/groups/{group_id}")
-def delete_group(group_id: str, db: Session = Depends(get_db)):
+def delete_group(group_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     group = db.query(ProjectGroup).filter(ProjectGroup.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="그룹을 찾을 수 없습니다")
@@ -39,7 +38,7 @@ def delete_group(group_id: str, db: Session = Depends(get_db)):
 
 # 프로젝트에 그룹 태그
 @router.post("/projects/{project_id}/groups")
-def tag_group(project_id: str, group_id: str, db: Session = Depends(get_db)):
+def tag_group(project_id: str, group_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     map = ProjectGroupMap(project_id=project_id, group_id=group_id)
     db.add(map)
     db.commit()
@@ -47,7 +46,7 @@ def tag_group(project_id: str, group_id: str, db: Session = Depends(get_db)):
 
 # 프로젝트 그룹 태그 해제
 @router.delete("/projects/{project_id}/groups/{group_id}")
-def untag_group(project_id: str, group_id: str, db: Session = Depends(get_db)):
+def untag_group(project_id: str, group_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     map = db.query(ProjectGroupMap).filter(
         ProjectGroupMap.project_id == project_id,
         ProjectGroupMap.group_id == group_id

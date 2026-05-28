@@ -2,28 +2,25 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.project import Project
-import uuid
 from app.models.simulation import Simulation
+from app.core.security import get_current_user_id
+import uuid
 
 router = APIRouter(prefix="/projects", tags=["프로젝트"])
 
-# 임시 user_id (나중에 JWT 인증으로 교체 예정)
-TEMP_USER_ID = "test-user-id-1234"
-
 # 전체 프로젝트 목록 조회
 @router.get("")
-def get_projects(db: Session = Depends(get_db)):
-    projects = db.query(Project).filter(Project.user_id == TEMP_USER_ID).all()
+def get_projects(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
+    projects = db.query(Project).filter(Project.user_id == user_id).all()
     return projects
 
 # 프로젝트 상세 조회
 @router.get("/{project_id}")
-def get_project(project_id: str, db: Session = Depends(get_db)):
+def get_project(project_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다")
-
-    # 이 프로젝트에 연결된 시뮬레이션 목록 조회 (차수별)
+    
     simulations = db.query(Simulation).filter(Simulation.project_id == project_id).all()
 
     return {
@@ -47,7 +44,7 @@ def get_project(project_id: str, db: Session = Depends(get_db)):
 
 # 프로젝트 수정
 @router.put("/{project_id}")
-def update_project(project_id: str, name: str, status: str, db: Session = Depends(get_db)):
+def update_project(project_id: str, name: str, status: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다")
@@ -59,7 +56,7 @@ def update_project(project_id: str, name: str, status: str, db: Session = Depend
 
 # 프로젝트 삭제
 @router.delete("/{project_id}")
-def delete_project(project_id: str, db: Session = Depends(get_db)):
+def delete_project(project_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다")

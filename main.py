@@ -3,12 +3,23 @@ from app.database import Base, engine
 from app import models
 from app.routers import project, group, todo, simulation
 from app.routers import image as image_router
+from app.routers import auth
 from sqlalchemy import text
 
 app = FastAPI(
     title="Creator-Flow API",
     description="굿즈 창작자를 위한 제작 가이드 앱",
     version="0.1.0"
+)
+
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], #프론트 주소
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 Base.metadata.create_all(bind=engine)
@@ -18,6 +29,7 @@ app.include_router(group.router)
 app.include_router(todo.router)
 app.include_router(simulation.router)
 app.include_router(image_router.router)
+app.include_router(auth.router)
 
 @app.get("/")
 def root():
