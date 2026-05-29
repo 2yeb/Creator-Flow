@@ -22,7 +22,18 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import com.example.creator_flow.model.GoodsDetailTypeDto;
+import com.example.creator_flow.model.GoodsTypeDto;
+import com.example.creator_flow.model.ProductOptionDto;
+import com.example.creator_flow.model.SimulationData;
+import com.example.creator_flow.model.VendorDto;
 import com.example.creator_flow.model.VendorInfo;
+import com.example.creator_flow.model.VendorProductDto;
+import com.example.creator_flow.network.RetrofitClient;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -326,6 +337,42 @@ public class SimulationDetail1Fragment extends Fragment {
     private String currentSubType;
     private final Map<String, String> selectedOptions = new HashMap<>();
 
+    /**
+     * 백엔드 GET /goods-types 응답으로 채워지는 굿즈 유형 이름 → ID 매핑.
+     * 비어있으면 mock 모드.
+     */
+    private final Map<String, String> goodsTypeNameToId = new HashMap<>();
+
+    /**
+     * 백엔드 GET /goods-types/{id}/details 응답으로 채워지는 세부 유형 이름 → ID 매핑.
+     * 향후 vendors / options API 호출 시 사용.
+     */
+    private final Map<String, String> subTypeNameToId = new HashMap<>();
+
+    /** GET /vendors 응답: 업체 이름 → 업체 ID */
+    private final Map<String, String> vendorNameToId = new HashMap<>();
+    /** GET /vendors 응답: 업체 이름 → 로고 URL (없을 수 있음) */
+    private final Map<String, String> vendorNameToLogoUrl = new HashMap<>();
+    /** GET /vendors/{id}/products 응답: 업체 이름 → VendorProductDto (현재 sub_type 기준) */
+    private final Map<String, VendorProductDto> vendorNameToProduct = new HashMap<>();
+    /** GET /vendor-products/{id}/options 응답: 업체 이름 → 옵션 DTO 리스트 */
+    private final Map<String, List<ProductOptionDto>> vendorNameToOptions = new HashMap<>();
+
+    /** API 응답으로 빌드된 vendor 리스트 (비어있으면 mock 모드) */
+    private final List<VendorInfo> apiVendors = new ArrayList<>();
+
+    /** 브랜드 색 팔레트 (이름 해시로 인덱스 결정) */
+    private static final int[] BRAND_COLOR_PALETTE = {
+            0xFF1A237E, 0xFFE53935, 0xFF1565C0,
+            0xFF212121, 0xFFFF6F00, 0xFF2E7D32
+    };
+    private static final int CARD_BG_COLOR = 0xFFEEF6CC;
+
+    private static int pickBrandColor(String name) {
+        if (name == null) return BRAND_COLOR_PALETTE[0];
+        return BRAND_COLOR_PALETTE[Math.abs(name.hashCode()) % BRAND_COLOR_PALETTE.length];
+    }
+
     public SimulationDetail1Fragment() {}
 
     public static SimulationDetail1Fragment newInstance() {
@@ -349,6 +396,8 @@ public class SimulationDetail1Fragment extends Fragment {
     /** 바텀시트에서 확정된 vendor 키 (null = 아직 선택 전) */
     private String confirmedVendorKey;
     private View nextButton;
+    /** 현재 화면이 표현 중인 모델 타입 (다음 화면으로 전달) */
+    private String currentModelType = MODEL_BUSINESS;
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
@@ -360,12 +409,12 @@ public class SimulationDetail1Fragment extends Fragment {
         nextButton.setOnClickListener(v -> goToPlatform());
 
         // 모델 헤더: Business / Fan-art 분기
+        currentModelType = getArguments() != null
+                ? getArguments().getString(ARG_MODEL_TYPE, MODEL_BUSINESS)
+                : MODEL_BUSINESS;
         TextView tvModelHeader = view.findViewById(R.id.tv_model_header);
         if (tvModelHeader != null) {
-            String modelType = getArguments() != null
-                    ? getArguments().getString(ARG_MODEL_TYPE, MODEL_BUSINESS)
-                    : MODEL_BUSINESS;
-            tvModelHeader.setText(MODEL_FANART.equals(modelType) ? "Fan-art Model" : "Business Model");
+            tvModelHeader.setText(MODEL_FANART.equals(currentModelType) ? "Fan-art Model" : "Business Model");
         }
 
         setupGoodsTypeSpinner(view);
@@ -374,10 +423,37 @@ public class SimulationDetail1Fragment extends Fragment {
     }
 
     private void goToPlatform() {
+        // 사용자가 선택한 값을 SimulationData에 저장 (요약 화면에서 사용)
+        SimulationData.modelType = currentModelType;
+        SimulationData.goodsType = currentGoodsType;
+        SimulationData.subType = currentSubType;
+        SimulationData.optionSummary = joinSelectedOptions();
+        SimulationData.vendorName = confirmedVendorKey;
+        // 수량 입력값 저장
+        View root = getView();
+        if (root != null) {
+            android.widget.EditText etValue = root.findViewById(R.id.tv_quantity_value);
+            if (etValue != null) {
+                try {
+                    SimulationData.quantity = Integer.parseInt(etValue.getText().toString().trim());
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+
         getParentFragmentManager().beginTransaction()
-                .replace(R.id.main_fragment, new SimulationPlatformFragment())
+                .replace(R.id.main_fragment, SimulationPlatformFragment.newInstance(currentModelType))
                 .addToBackStack(null)
                 .commit();
+    }
+
+    /** selectedOptions 값들을 " · " 로 연결 (예: "유광 · 라미 · 칼선") */
+    private String joinSelectedOptions() {
+        StringBuilder sb = new StringBuilder();
+        for (String v : selectedOptions.values()) {
+            if (sb.length() > 0) sb.append(" · ");
+            sb.append(v);
+        }
+        return sb.toString();
     }
 
     // ============= 굿즈 유형 Spinner =============
@@ -391,6 +467,53 @@ public class SimulationDetail1Fragment extends Fragment {
             }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
+
+        // 백엔드에서 굿즈 유형 동적 로드 (실패/빈 응답 시 XML의 mock 유지)
+        loadGoodsTypesFromApi(sp);
+    }
+
+    /**
+     * GET /goods-types 호출.
+     * - 성공 + 데이터 있음 → API 응답으로 Spinner adapter 교체
+     * - 실패 / 빈 응답 / 네트워크 에러 → XML mock(goods_type_items) 유지
+     */
+    private void loadGoodsTypesFromApi(Spinner sp) {
+        if (getContext() == null) return;
+        RetrofitClient.getApi(requireContext()).getGoodsTypes()
+                .enqueue(new Callback<List<GoodsTypeDto>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<List<GoodsTypeDto>> call,
+                                           @NonNull Response<List<GoodsTypeDto>> resp) {
+                        if (!isAdded()) return;
+                        if (resp.isSuccessful()
+                                && resp.body() != null
+                                && !resp.body().isEmpty()) {
+                            applyApiGoodsTypes(sp, resp.body());
+                        }
+                        // 그 외: XML mock 유지 (no-op)
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<List<GoodsTypeDto>> call,
+                                          @NonNull Throwable t) {
+                        // 네트워크 에러: mock 유지 (no-op)
+                    }
+                });
+    }
+
+    private void applyApiGoodsTypes(Spinner sp, List<GoodsTypeDto> list) {
+        List<String> names = new ArrayList<>();
+        goodsTypeNameToId.clear();
+        for (GoodsTypeDto dto : list) {
+            if (dto.name == null) continue;
+            names.add(dto.name);
+            if (dto.id != null) goodsTypeNameToId.put(dto.name, dto.id);
+        }
+        if (names.isEmpty()) return;
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, names);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        sp.setAdapter(adapter);
     }
 
     private void onGoodsTypeChanged(View root, String goodsType) {
@@ -410,8 +533,9 @@ public class SimulationDetail1Fragment extends Fragment {
         }
 
         subCard.setVisibility(View.VISIBLE);
-        List<String> subTypes = GOODS_TYPE_TO_SUBTYPES.getOrDefault(goodsType, Collections.emptyList());
 
+        // 1) Mock 데이터로 즉시 채움 (instant feedback + 폴백)
+        List<String> subTypes = GOODS_TYPE_TO_SUBTYPES.getOrDefault(goodsType, Collections.emptyList());
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_item, new ArrayList<>(subTypes));
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -422,6 +546,109 @@ public class SimulationDetail1Fragment extends Fragment {
             // setSelection(false)는 콜백을 발생시키지 않으므로 수동 트리거
             onSubTypeChanged(root, subTypes.get(0));
         }
+
+        // 2) goods type이 API 응답으로 들어왔으면, ID로 detail-types API 호출 (성공 시 mock 위에 덮어씀)
+        String goodsTypeId = goodsTypeNameToId.get(goodsType);
+        if (goodsTypeId != null) {
+            loadGoodsDetailTypesFromApi(root, goodsType, goodsTypeId);
+            loadVendorsFromApi(goodsType, goodsTypeId);
+        } else {
+            // mock 모드: 세부 유형 ID는 알 수 없음
+            subTypeNameToId.clear();
+            vendorNameToId.clear();
+            vendorNameToLogoUrl.clear();
+        }
+    }
+
+    /**
+     * GET /vendors?goods_type_id={id} 호출.
+     * 성공 시 vendorNameToId 갱신. UI는 mock 유지 (현재는 백그라운드 수집 용도).
+     */
+    private void loadVendorsFromApi(String goodsTypeAtRequest, String goodsTypeId) {
+        if (getContext() == null) return;
+        RetrofitClient.getApi(requireContext()).getVendors(goodsTypeId)
+                .enqueue(new Callback<List<VendorDto>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<List<VendorDto>> call,
+                                           @NonNull Response<List<VendorDto>> resp) {
+                        if (!isAdded()) return;
+                        if (!goodsTypeAtRequest.equals(currentGoodsType)) return;
+                        if (resp.isSuccessful() && resp.body() != null) {
+                            vendorNameToId.clear();
+                            vendorNameToLogoUrl.clear();
+                            for (VendorDto v : resp.body()) {
+                                if (v.name != null && v.id != null) {
+                                    vendorNameToId.put(v.name, v.id);
+                                    if (v.logoUrl != null && !v.logoUrl.isEmpty()) {
+                                        vendorNameToLogoUrl.put(v.name, v.logoUrl);
+                                    }
+                                }
+                            }
+                            // sub_type ID도 알면 product 호출도 트리거
+                            String subTypeId = subTypeNameToId.get(currentSubType);
+                            if (subTypeId != null) {
+                                loadVendorProductsForAll(currentSubType, subTypeId);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<List<VendorDto>> call, @NonNull Throwable t) {
+                        // mock 유지
+                    }
+                });
+    }
+
+    /**
+     * GET /goods-types/{id}/details 호출.
+     * - 성공 + 데이터 있음 → 세부 유형 Spinner를 API 응답으로 교체
+     * - 실패 / 빈 응답 → mock 그대로 유지
+     * - 사용자가 응답 도착 전에 다른 굿즈 유형으로 바꿨다면 무시 (race 가드)
+     */
+    private void loadGoodsDetailTypesFromApi(View root, String goodsTypeAtRequest, String goodsTypeId) {
+        if (getContext() == null) return;
+        RetrofitClient.getApi(requireContext()).getGoodsDetailTypes(goodsTypeId)
+                .enqueue(new Callback<List<GoodsDetailTypeDto>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<List<GoodsDetailTypeDto>> call,
+                                           @NonNull Response<List<GoodsDetailTypeDto>> resp) {
+                        if (!isAdded()) return;
+                        // 사용자가 다른 굿즈 유형으로 이동했으면 무시
+                        if (!goodsTypeAtRequest.equals(currentGoodsType)) return;
+
+                        if (resp.isSuccessful()
+                                && resp.body() != null
+                                && !resp.body().isEmpty()) {
+                            applyApiSubTypes(root, resp.body());
+                        }
+                        // 그 외: mock 유지 (no-op)
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<List<GoodsDetailTypeDto>> call,
+                                          @NonNull Throwable t) {
+                        // 네트워크 에러: mock 유지 (no-op)
+                    }
+                });
+    }
+
+    private void applyApiSubTypes(View root, List<GoodsDetailTypeDto> list) {
+        Spinner subSp = root.findViewById(R.id.spinner_sub_type);
+        List<String> names = new ArrayList<>();
+        subTypeNameToId.clear();
+        for (GoodsDetailTypeDto dto : list) {
+            if (dto.name == null) continue;
+            names.add(dto.name);
+            if (dto.id != null) subTypeNameToId.put(dto.name, dto.id);
+        }
+        if (names.isEmpty()) return;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, names);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        subSp.setAdapter(adapter);
+        subSp.setSelection(0, false);
+        onSubTypeChanged(root, names.get(0));
     }
 
     // ============= 세부 유형 Spinner =============
@@ -450,13 +677,142 @@ public class SimulationDetail1Fragment extends Fragment {
         }
         renderOptionChips(root);
         renderVendorCards(root);
+
+        // 백엔드에서 세부 유형 ID를 알면, 모든 업체의 vendor_product를 fetch (+ 각 product의 옵션도)
+        String subTypeId = subTypeNameToId.get(subType);
+        if (subTypeId != null && !vendorNameToId.isEmpty()) {
+            loadVendorProductsForAll(subType, subTypeId);
+        } else {
+            vendorNameToProduct.clear();
+            vendorNameToOptions.clear();
+            apiVendors.clear();
+        }
+    }
+
+    /**
+     * 알고 있는 모든 업체에 대해 GET /vendors/{id}/products?goods_detail_type_id= 병렬 호출.
+     * 각 응답에서 vendor_product_id를 저장하고, 이어서 옵션 API도 호출.
+     */
+    private void loadVendorProductsForAll(String subTypeAtRequest, String subTypeId) {
+        if (getContext() == null) return;
+        vendorNameToProduct.clear();
+        vendorNameToOptions.clear();
+        apiVendors.clear();
+
+        for (Map.Entry<String, String> entry : vendorNameToId.entrySet()) {
+            final String vendorName = entry.getKey();
+            final String vendorId = entry.getValue();
+            RetrofitClient.getApi(requireContext())
+                    .getVendorProducts(vendorId, subTypeId)
+                    .enqueue(new Callback<List<VendorProductDto>>() {
+                        @Override
+                        public void onResponse(@NonNull Call<List<VendorProductDto>> call,
+                                               @NonNull Response<List<VendorProductDto>> resp) {
+                            if (!isAdded()) return;
+                            if (!subTypeAtRequest.equals(currentSubType)) return;
+                            if (resp.isSuccessful() && resp.body() != null && !resp.body().isEmpty()) {
+                                VendorProductDto vp = resp.body().get(0);  // 첫 상품 사용
+                                if (vp.id != null) {
+                                    vendorNameToProduct.put(vendorName, vp);
+                                    rebuildAndRenderApiVendors();
+                                    loadOptionsForProduct(subTypeAtRequest, vendorName, vp.id);
+                                }
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(@NonNull Call<List<VendorProductDto>> call,
+                                              @NonNull Throwable t) {
+                            // 개별 실패는 무시 (해당 업체만 API 데이터 없음)
+                        }
+                    });
+        }
+    }
+
+    /**
+     * GET /vendor-products/{id}/options 호출.
+     * 옵션 DTO 리스트를 vendorNameToOptions에 저장. UI는 mock 칩 유지.
+     */
+    private void loadOptionsForProduct(String subTypeAtRequest, String vendorName, String vendorProductId) {
+        if (getContext() == null) return;
+        RetrofitClient.getApi(requireContext())
+                .getVendorProductOptions(vendorProductId)
+                .enqueue(new Callback<List<ProductOptionDto>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<List<ProductOptionDto>> call,
+                                           @NonNull Response<List<ProductOptionDto>> resp) {
+                        if (!isAdded()) return;
+                        if (!subTypeAtRequest.equals(currentSubType)) return;
+                        if (resp.isSuccessful() && resp.body() != null) {
+                            vendorNameToOptions.put(vendorName, resp.body());
+                            rebuildAndRenderApiVendors();
+                            // 옵션 칩도 다시 그림 (API 옵션 우선 사용)
+                            View root = getView();
+                            if (root != null) renderOptionChips(root);
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<List<ProductOptionDto>> call,
+                                          @NonNull Throwable t) {
+                        // 무시
+                    }
+                });
+    }
+
+    /**
+     * vendorNameToId + vendorNameToProduct + vendorNameToOptions 로부터 apiVendors를 재빌드하고
+     * 업체 카드 다시 렌더.
+     */
+    private void rebuildAndRenderApiVendors() {
+        apiVendors.clear();
+        for (Map.Entry<String, VendorProductDto> e : vendorNameToProduct.entrySet()) {
+            String name = e.getKey();
+            VendorProductDto vp = e.getValue();
+
+            // 옵션 → capabilities 매핑 (현재 sub_type 한정)
+            Map<String, Map<String, Set<String>>> capabilities = new HashMap<>();
+            Map<String, Set<String>> subTypeCaps = new HashMap<>();
+            List<ProductOptionDto> opts = vendorNameToOptions.get(name);
+            if (opts != null) {
+                for (ProductOptionDto opt : opts) {
+                    if (opt.optionName == null || opt.optionValue == null) continue;
+                    subTypeCaps.computeIfAbsent(opt.optionName, k -> new HashSet<>())
+                            .add(opt.optionValue);
+                }
+            }
+            if (currentSubType != null) {
+                capabilities.put(currentSubType, subTypeCaps);
+            }
+
+            int shippingFee = vp.shippingFee != null ? vp.shippingFee : 0;
+            boolean freeShipping = vp.freeShippingMin == null && shippingFee == 0;
+
+            VendorInfo info = new VendorInfo(
+                    name,
+                    pickBrandColor(name),
+                    CARD_BG_COLOR,
+                    0,                         // basePrice: POST /simulations 이전엔 모름
+                    shippingFee,
+                    freeShipping,
+                    capabilities
+            );
+            info.logoUrl = vendorNameToLogoUrl.get(name);  // 백엔드에서 받은 로고 URL
+            apiVendors.add(info);
+        }
+        View root = getView();
+        if (root != null) renderVendorCards(root);
     }
 
     // ============= 옵션 칩 =============
     private void renderOptionChips(View root) {
         LinearLayout container = root.findViewById(R.id.options_chip_container);
         container.removeAllViews();
-        LinkedHashMap<String, List<String>> opts = SUBTYPE_OPTIONS.get(currentSubType);
+        // API 옵션이 모였으면 그걸 우선 사용, 아니면 mock
+        LinkedHashMap<String, List<String>> opts = aggregateApiOptions();
+        if (opts == null || opts.isEmpty()) {
+            opts = SUBTYPE_OPTIONS.get(currentSubType);
+        }
         if (opts == null || opts.isEmpty()) {
             renderOptionChipsEmpty(root, "선택할 옵션이 없습니다.");
             return;
@@ -481,17 +837,12 @@ public class SimulationDetail1Fragment extends Fragment {
             label.setLayoutParams(new LinearLayout.LayoutParams(dp(64), LinearLayout.LayoutParams.WRAP_CONTENT));
             row.addView(label);
 
+            LayoutInflater inflater = LayoutInflater.from(getContext());
             for (String value : values) {
-                TextView chip = new TextView(getContext());
+                // item_option_chip.xml은 PackagingChip 스타일을 사용 → styles.xml에서 한 번에 관리
+                TextView chip = (TextView) inflater.inflate(R.layout.item_option_chip, row, false);
                 chip.setText(value);
-                chip.setTextSize(13f);
-                chip.setPadding(dp(14), dp(6), dp(14), dp(6));
-                LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT);
-                chipLp.rightMargin = dp(6);
-                chip.setLayoutParams(chipLp);
-                applyChipStyle(chip, value.equals(selectedOptions.get(category)));
+                chip.setSelected(value.equals(selectedOptions.get(category)));
                 chip.setOnClickListener(v -> {
                     selectedOptions.put(category, value);
                     renderOptionChips(root);
@@ -501,6 +852,28 @@ public class SimulationDetail1Fragment extends Fragment {
             }
             container.addView(row);
         }
+    }
+
+    /**
+     * 모든 업체의 옵션을 (category → 값들)로 집계.
+     * vendorNameToOptions가 비어있으면 null 반환 (mock fallback 트리거).
+     */
+    private LinkedHashMap<String, List<String>> aggregateApiOptions() {
+        if (vendorNameToOptions.isEmpty()) return null;
+        java.util.LinkedHashMap<String, java.util.LinkedHashSet<String>> agg = new java.util.LinkedHashMap<>();
+        for (List<ProductOptionDto> options : vendorNameToOptions.values()) {
+            for (ProductOptionDto opt : options) {
+                if (opt.optionName == null || opt.optionValue == null) continue;
+                agg.computeIfAbsent(opt.optionName, k -> new java.util.LinkedHashSet<>())
+                        .add(opt.optionValue);
+            }
+        }
+        if (agg.isEmpty()) return null;
+        LinkedHashMap<String, List<String>> result = new LinkedHashMap<>();
+        for (Map.Entry<String, java.util.LinkedHashSet<String>> e : agg.entrySet()) {
+            result.put(e.getKey(), new ArrayList<>(e.getValue()));
+        }
+        return result;
     }
 
     private void renderOptionChipsEmpty(View root, String message) {
@@ -513,14 +886,26 @@ public class SimulationDetail1Fragment extends Fragment {
         container.addView(empty);
     }
 
-    private void applyChipStyle(TextView chip, boolean selected) {
-        if (selected) {
-            chip.setBackgroundResource(R.drawable.chip_selected);
-            chip.setTextColor(Color.parseColor("#313131"));
-        } else {
-            chip.setBackgroundResource(R.drawable.chip_unselected);
-            chip.setTextColor(Color.parseColor("#9A9A9A"));
+    /** 현재 굿즈 유형/세부유형/옵션 조합에 맞는 vendor 리스트 — 카드/바텀시트 공통 사용 */
+    private List<VendorInfo> computeMatchingVendors() {
+        if (currentSubType == null) return Collections.emptyList();
+
+        boolean apiMode = !apiVendors.isEmpty();
+        List<VendorInfo> source = apiMode ? apiVendors : ALL_VENDORS;
+        List<VendorInfo> matching = new ArrayList<>();
+        for (VendorInfo v : source) {
+            // mock 모드일 때만 supports(subType) 필터 — API 모드는 서버에서 이미 필터링됨
+            if (!apiMode && !v.supports(currentSubType)) continue;
+            boolean ok = true;
+            for (Map.Entry<String, String> sel : selectedOptions.entrySet()) {
+                if (!v.supportsOption(currentSubType, sel.getKey(), sel.getValue())) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) matching.add(v);
         }
+        return matching;
     }
 
     // ============= 업체 카드 =============
@@ -533,18 +918,7 @@ public class SimulationDetail1Fragment extends Fragment {
             return;
         }
 
-        List<VendorInfo> matching = new ArrayList<>();
-        for (VendorInfo v : ALL_VENDORS) {
-            if (!v.supports(currentSubType)) continue;
-            boolean ok = true;
-            for (Map.Entry<String, String> sel : selectedOptions.entrySet()) {
-                if (!v.supportsOption(currentSubType, sel.getKey(), sel.getValue())) {
-                    ok = false;
-                    break;
-                }
-            }
-            if (ok) matching.add(v);
-        }
+        List<VendorInfo> matching = computeMatchingVendors();
 
         if (matching.isEmpty()) {
             renderVendorCardsEmpty(root, "조건에 맞는 업체가 없습니다.");
@@ -593,8 +967,16 @@ public class SimulationDetail1Fragment extends Fragment {
 
         card.setBackgroundTintList(android.content.res.ColorStateList.valueOf(vendor.cardBgColor));
 
-        View colorBox = card.findViewById(R.id.vendor_color_box);
-        colorBox.setBackgroundTintList(android.content.res.ColorStateList.valueOf(vendor.brandColor));
+        // 로고 박스: brandColor를 fallback으로 사용, logoUrl 있으면 Glide로 덮어 그림
+        android.widget.ImageView logoBox = card.findViewById(R.id.vendor_color_box);
+        logoBox.setBackgroundTintList(android.content.res.ColorStateList.valueOf(vendor.brandColor));
+        if (vendor.logoUrl != null && !vendor.logoUrl.isEmpty()) {
+            com.bumptech.glide.Glide.with(this)
+                    .load(vendor.logoUrl)
+                    .into(logoBox);
+        } else {
+            logoBox.setImageDrawable(null);  // mock 모드: 이미지 비우고 색 박스만 보임
+        }
 
         ((TextView) card.findViewById(R.id.tv_vendor_name)).setText(vendor.name);
         ((TextView) card.findViewById(R.id.tv_vendor_price)).setText(formatPrice(vendor.basePrice));
@@ -673,13 +1055,76 @@ public class SimulationDetail1Fragment extends Fragment {
     // ============= 바텀시트 =============
     private void openVendorBottomSheet() {
         VendorSelectBottomSheet sheet = new VendorSelectBottomSheet();
-        sheet.setOnVendorSelectedListener(vendorKey -> {
-            // "선택" 버튼 누르면 콜백 → 다음 화살표 노출
-            confirmedVendorKey = vendorKey;
+
+        // detail1에서 보이는 그 업체들만 바텀시트에 (동일한 매칭 로직)
+        List<VendorInfo> matching = computeMatchingVendors();
+        android.util.Log.d("VendorBottomSheet",
+                "openSheet: goodsType=" + currentGoodsType
+                        + ", subType=" + currentSubType
+                        + ", apiMode=" + !apiVendors.isEmpty()
+                        + ", apiVendors=" + apiVendors.size()
+                        + ", matching=" + matching.size() + " vendors: "
+                        + matching.stream().map(v -> v.name)
+                            .collect(java.util.stream.Collectors.toList()));
+        sheet.setVendors(matching);
+        sheet.setSubType(currentSubType);
+        sheet.setSelectedOptions(selectedOptions);
+
+        // 상단 필터 칩 — 현재 세부 유형 + 수량
+        List<String> filterChips = new ArrayList<>();
+        if (currentSubType != null) filterChips.add(currentSubType);
+        if (SimulationData.quantity != null) filterChips.add(SimulationData.quantity + "개");
+        sheet.setFilterChips(filterChips);
+
+        sheet.setOnVendorSelectedListener(vendorName -> {
+            confirmedVendorKey = vendorName;
+            SimulationData.vendorName = vendorName;
+
+            // ✅ POST /simulations에 보낼 실제 ID들 commit
+            VendorProductDto vp = vendorNameToProduct.get(vendorName);
+            SimulationData.vendorProductId = (vp != null) ? vp.id : null;
+
+            // 선택한 (optionName, optionValue) 조합을 ProductOptionDto.id로 변환
+            List<ProductOptionDto> opts = vendorNameToOptions.get(vendorName);
+            List<String> ids = new ArrayList<>();
+            if (opts != null) {
+                for (Map.Entry<String, String> sel : selectedOptions.entrySet()) {
+                    for (ProductOptionDto o : opts) {
+                        if (sel.getKey().equals(o.optionName)
+                                && sel.getValue().equals(o.optionValue)) {
+                            if (o.id != null) ids.add(o.id);
+                            break;
+                        }
+                    }
+                }
+            }
+            SimulationData.selectedOptionIds = ids;
+
+            // ✅ 선택한 업체의 가격(기본 + 배송)을 예상 원가로 SimulationData에 저장.
+            //    BusinessFragment의 "예상 원가" 행에서 즉시 표시됨.
+            //    POST /simulations 응답이 오면 그 값(서버 계산)으로 덮어쓰는 게 정확하지만,
+            //    확인 누르기 전엔 vendor.basePrice + shipping을 임시 표시.
+            for (VendorInfo v : matching) {
+                if (vendorName.equals(v.name)) {
+                    int total = v.basePrice + (v.freeShipping ? 0 : v.shippingFee);
+                    SimulationData.estimatedCost = total;
+                    break;
+                }
+            }
+
             if (nextButton != null) {
                 nextButton.setVisibility(View.VISIBLE);
             }
-            Toast.makeText(getContext(), "선택된 업체: " + vendorKey, Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "선택된 업체: " + vendorName, Toast.LENGTH_SHORT).show();
+        });
+
+        // 바텀시트에서 옵션 chip이 바뀌었으면 dismiss 시 detail1 화면도 다시 그림.
+        // selectedOptions는 sheet와 같은 Map 참조이므로 값은 이미 바뀐 상태 → 그리기만 하면 됨.
+        sheet.setOnOptionsChangedListener(() -> {
+            View root = getView();
+            if (root == null) return;
+            renderOptionChips(root);
+            renderVendorCards(root);
         });
         sheet.show(getParentFragmentManager(), VendorSelectBottomSheet.TAG);
     }

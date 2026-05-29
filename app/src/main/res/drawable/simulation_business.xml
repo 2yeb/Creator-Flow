@@ -3,6 +3,11 @@
     android:height="78dp"
     android:viewportWidth="71"
     android:viewportHeight="78">
+  <!-- 콘텐츠 시각적 중앙 정렬:
+       기존 콘텐츠 Y 범위 3.5~69.5 (위 여백 3.5 / 아래 여백 8.5) → 위로 2.5 치우침
+       기존 콘텐츠 X 범위 11.4~68.2 (왼 여백 11.4 / 오른 여백 2.8) → 오른쪽으로 4.3 치우침
+       translateX/Y로 보정 -->
+  <group android:translateX="-4.3" android:translateY="2.5">
   <path
       android:pathData="M29,63.109H14.2C12.78,63.109 11.36,61.691 11.36,60.273V6.382C11.36,4.964 12.78,3.545 14.2,3.545H49.7L60.35,14.182V53.5"
       android:strokeLineJoin="round"
@@ -89,4 +94,5 @@
       android:strokeWidth="2"
       android:fillColor="#00000000"
       android:strokeColor="#ffffff"/>
+  </group>
 </vector>

@@ -10,13 +10,15 @@ import java.util.Set;
  */
 public class VendorInfo {
     public final String name;
-    public final int brandColor;       // 좌상단 색상 박스
+    public final int brandColor;       // 좌상단 색상 박스 (로고 없을 때 fallback)
     public final int cardBgColor;      // 카드 자체 배경 틴트
     public final int basePrice;        // 기본 가격
     public final int shippingFee;      // 배송비
     public final boolean freeShipping; // 무료 배송 여부
     /** subType → optionCategory → 지원 값들 */
     public final Map<String, Map<String, Set<String>>> capabilities;
+    /** 백엔드에서 받은 로고 URL (mock은 null) */
+    public String logoUrl;
 
     public VendorInfo(String name, int brandColor, int cardBgColor,
                       int basePrice, int shippingFee, boolean freeShipping,
