@@ -1,0 +1,80 @@
+package com.example.creator_flow.model;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+import com.google.gson.Gson;
+
+import java.util.List;
+
+/**
+ * 시뮬레이션 흐름 중 사용자가 선택/입력한 값을 누적 보관.
+ * 각 fragment가 자기가 받은 값을 여기에 set하고, 마지막 요약 화면(Business)이 read.
+ *
+ * 향후 백엔드 API로 대체될 때:
+ * - set()들은 그대로 두되, 요약 화면에서 API 응답을 받으면 이 클래스를 덮어쓰거나 무시
+ * - reset()으로 새 시뮬레이션 시작 시 초기화
+ */
+public class SimulationData {
+
+    // ===== 모델 =====
+    public static String modelType;        // "Business" | "Fanart"
+
+    // ===== Detail1 =====
+    public static String goodsType;        // 굿즈 유형 (스티커 등)
+    public static String subType;          // 세부 유형 (완칼 스티커 등)
+    public static String optionSummary;    // 옵션 요약 ("유광 · 라미 · 칼선")
+    public static Integer quantity;        // 수량
+    public static String vendorName;       // 제작 업체 (표시용)
+    /** POST /simulations 에 사용할 vendor_product의 실제 UUID. mock 모드에선 null */
+    public static String vendorProductId;
+    /** POST /simulations 에 사용할 옵션들의 실제 UUID 리스트. mock 모드에선 빈 리스트 */
+    public static List<String> selectedOptionIds;
+
+    // ===== Platform =====
+    public static String platformName;     // 판매 업체 (윗치폼/텀블벅 등) — 표시용
+    public static Integer platformFee;     // 수수료(%) — Business일 때만 의미 있음
+    /** POST /simulations 에 사용할 platform_plan의 실제 UUID. mock 모드에선 null */
+    public static String platformPlanId;
+
+    // ===== Delivery =====
+    public static String deliveryMethod;   // 택배 옵션 (편의점 택배 등)
+    public static String shippingFeeType;  // 배송비 (구매자 부담 / 판매자 택배)
+    public static String packagingType;    // 포장재
+    /** 구매자 부담 선택 시 사용자가 입력한 배송비 금액 (원). 판매자 택배면 null */
+    public static Integer shippingFeeBuyer;
+
+    // ===== Detail2 (입력값) =====
+    public static Integer profit;          // 희망 순이익 (Business 전용)
+    public static Integer marginRate;      // 희망 마진율 (Business 전용)
+    public static Integer targetQuantity;  // 목표 판매량
+    public static Integer minStock;        // 최소 재고량
+
+    // ===== 계산값 (백엔드 또는 클라이언트가 산출) =====
+    public static Integer estimatedCost;   // 예상 원가
+
+    public static void reset() {
+        modelType = null;
+        goodsType = null;
+        subType = null;
+        optionSummary = null;
+        quantity = null;
+        vendorName = null;
+        vendorProductId = null;
+        selectedOptionIds = null;
+        platformName = null;
+        platformFee = null;
+        platformPlanId = null;
+        deliveryMethod = null;
+        shippingFeeType = null;
+        packagingType = null;
+        shippingFeeBuyer = null;
+        profit = null;
+        marginRate = null;
+        targetQuantity = null;
+        minStock = null;
+        estimatedCost = null;
+    }
+
+    private SimulationData() {}
+}

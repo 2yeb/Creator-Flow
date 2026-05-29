@@ -24,8 +24,9 @@
             android:paddingTop="80dp"
             android:paddingBottom="40dp">
 
-            <!-- Business Model 헤더 (detail1과 동일 위치/스타일) -->
+            <!-- Business / Fan-art Model 헤더 (Java에서 동적 변경) -->
             <TextView
+                android:id="@+id/tv_model_header"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Business Model"
@@ -38,7 +39,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="19dp"
-                app:cardElevation="10dp"
+                app:cardElevation="5dp"
                 app:cardBackgroundColor="@color/white">
 
                 <LinearLayout

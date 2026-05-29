@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 예상 원가 강조 박스 (lime 배경 + lime stroke) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/buttoncolor1" />
+    <stroke
+        android:width="2dp"
+        android:color="@color/outline" />
+    <corners android:radius="16dp" />
+</shape>

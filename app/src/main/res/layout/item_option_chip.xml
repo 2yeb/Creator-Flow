@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  옵션 칩 (PackagingChip 스타일 사용)
+  PackagingChip(styles.xml)를 수정하면 detail1 옵션과 delivery 포장재 둘 다 동시 반영됨.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/PackagingChip"
+    android:layout_marginEnd="8dp" />
