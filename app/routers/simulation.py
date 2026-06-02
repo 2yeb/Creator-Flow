@@ -223,3 +223,71 @@ def get_simulation(simulation_id: str, db: Session = Depends(get_db), user_id: s
         "revenue_rate": revenue_rate,
         "break_even_quantity": break_even_quantity
     }
+
+# 시뮬레이션 수정
+@router.put("/simulations/{simulation_id}")
+def update_simulation(
+    simulation_id: str,
+    quantity: int = None,
+    selling_price: int = None,
+    actual_quantity: int = None,
+    target_quantity: int = None,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    simulation = db.query(Simulation).filter(Simulation.id == simulation_id).first()
+    if not simulation:
+        raise HTTPException(status_code=404, detail="시뮬레이션을 찾을 수 없습니다")
+
+    # 값 업데이트
+    if quantity is not None:
+        simulation.quantity = quantity
+    if selling_price is not None:
+        simulation.selling_price = selling_price
+    if actual_quantity is not None:
+        simulation.actual_quantity = actual_quantity
+    if target_quantity is not None:
+        simulation.target_quantity = target_quantity
+
+    db.commit()
+    db.refresh(simulation)
+
+    # 수정된 값으로 계산값 다시 계산
+    from app.models.crawling import VendorProduct, PriceByQuantity, PlatformPlan
+    vendor_product = db.query(VendorProduct).filter(VendorProduct.id == simulation.vendor_product_id).first()
+    plan = db.query(PlatformPlan).filter(PlatformPlan.id == simulation.platform_plan_id).first()
+    price_row = db.query(PriceByQuantity).filter(
+        PriceByQuantity.vendor_product_id == simulation.vendor_product_id,
+        PriceByQuantity.quantity <= simulation.quantity
+    ).order_by(PriceByQuantity.quantity.desc()).first()
+
+    unit_cost = price_row.unit_price if price_row else 0
+    total_cost = unit_cost * simulation.quantity
+    total_revenue = simulation.selling_price * simulation.quantity
+    total_fee = total_revenue * (plan.fee_rate / 100) if plan else 0
+    net_profit = total_revenue - total_cost - total_fee - (vendor_product.shipping_fee if vendor_product else 0)
+    revenue_rate = round((net_profit / total_revenue) * 100, 1) if total_revenue > 0 else 0
+
+    return {
+        "simulation_id": simulation.id,
+        "quantity": simulation.quantity,
+        "selling_price": simulation.selling_price,
+        "actual_quantity": simulation.actual_quantity,
+        "target_quantity": simulation.target_quantity,
+        "unit_cost": unit_cost,
+        "total_cost": total_cost,
+        "expected_revenue": int(total_revenue),
+        "total_fee": round(total_fee),
+        "net_profit": round(net_profit),
+        "revenue_rate": revenue_rate
+    }
+
+# 차시 하나 삭제
+@router.delete("/simulations/{simulation_id}")
+def delete_simulation(simulation_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
+    simulation = db.query(Simulation).filter(Simulation.id == simulation_id).first()
+    if not simulation:
+        raise HTTPException(status_code=404, detail="시뮬레이션을 찾을 수 없습니다")
+    db.delete(simulation)
+    db.commit()
+    return {"message": "삭제 완료"}
