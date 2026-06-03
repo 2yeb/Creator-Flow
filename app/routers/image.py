@@ -9,13 +9,17 @@ import shutil
 
 router = APIRouter(tags=["프로젝트 이미지"])
 
-# 이미지 저장 폴더
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# 이미지 업로드
 @router.post("/projects/{project_id}/images")
-def upload_image(project_id: str, image: UploadFile = File(...), db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
+def upload_image(
+    project_id: str,
+    image: UploadFile = File(...),
+    simulation_id: str = None,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
     ext = image.filename.split(".")[-1].lower()
     if ext not in ["jpg", "jpeg", "png", "gif", "webp"]:
         raise HTTPException(status_code=400, detail="이미지 파일만 업로드 가능합니다")
@@ -32,6 +36,7 @@ def upload_image(project_id: str, image: UploadFile = File(...), db: Session = D
     project_image = ProjectImage(
         id=image_id,
         project_id=project_id,
+        simulation_id=simulation_id,
         image_url=f"/uploads/{filename}",
         order=count + 1
     )
@@ -41,10 +46,10 @@ def upload_image(project_id: str, image: UploadFile = File(...), db: Session = D
 
     return {
         "image_id": project_image.id,
-        "image_url": project_image.image_url
+        "image_url": project_image.image_url,
+        "simulation_id": project_image.simulation_id
     }
 
-# 이미지 삭제
 @router.delete("/projects/{project_id}/images/{image_id}")
 def delete_image(project_id: str, image_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     project_image = db.query(ProjectImage).filter(

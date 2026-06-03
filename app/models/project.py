@@ -19,6 +19,7 @@ class ProjectImage(Base):
 
     id = Column(CHAR(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     project_id = Column(CHAR(36), ForeignKey("project.id"), nullable=False)
+    simulation_id = Column(CHAR(36), ForeignKey("simulation.id"), nullable=True)
     image_url = Column(String(500), nullable=False)
     order = Column(Integer, nullable=False)
 
