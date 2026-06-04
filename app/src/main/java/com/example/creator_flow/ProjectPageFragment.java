@@ -51,7 +51,6 @@ import androidx.fragment.app.Fragment;
 import com.example.creator_flow.model.ImageUploadResponse;
 import com.example.creator_flow.model.ProjectFile;
 import com.example.creator_flow.model.ProjectResponse;
-import com.example.creator_flow.model.UpdateProjectRequest;
 import com.example.creator_flow.network.RetrofitClient;
 
 import java.io.InputStream;
@@ -134,7 +133,10 @@ public class ProjectPageFragment extends Fragment {
     private TextView calender;           // 날짜 선택 텍스트뷰
     private ImageButton btnAddChasi;     // 차시 추가 버튼
     private EditText etPrice;            // 단가 입력 필드
+    private EditText etQuantity;         // 수량 입력 필드
     private EditText etRetailPrice;      // 판매가 입력 필드
+    private EditText etManufacturer;     // 제작 업체 입력 필드
+    private EditText etSeller;           // 판매 업체 입력 필드
     private EditText etCommission;       // 판매 수수료(%) 입력 필드
     private LineChart chartUnitPrice;      // 차수별 단가 라인차트
     private PieChart chartProfitStructure; // 수익 구조 파이차트
@@ -142,6 +144,7 @@ public class ProjectPageFragment extends Fragment {
     private EditText etTargetQuantity;     // 목표 판매량 입력
     private ProgressBar progressSales;     // 판매 달성률 프로그레스바
     private TextView tvSalesPercent;       // 달성 퍼센트 텍스트
+    private android.widget.Button btnDeleteFile;  // 파일 삭제 버튼 (DELETE /projects/{id})
 
     public ProjectPageFragment() {}
 
@@ -223,7 +226,10 @@ public class ProjectPageFragment extends Fragment {
         btnAddChasi     = view.findViewById(R.id.folder_add);
         photoAddBox      = view.findViewById(R.id.photo_add_box);
         etPrice               = view.findViewById(R.id.et_price);
+        etQuantity            = view.findViewById(R.id.et_quantity);
         etRetailPrice         = view.findViewById(R.id.et_retail_price);
+        etManufacturer        = view.findViewById(R.id.et_manufacturer);
+        etSeller              = view.findViewById(R.id.et_seller);
         etCommission          = view.findViewById(R.id.et_commission);
         chartUnitPrice        = view.findViewById(R.id.chart_unit_price);
         chartProfitStructure  = view.findViewById(R.id.chart_profit_structure);
@@ -231,6 +237,7 @@ public class ProjectPageFragment extends Fragment {
         etTargetQuantity      = view.findViewById(R.id.et_target_quantity);
         progressSales         = view.findViewById(R.id.progress_sales);
         tvSalesPercent        = view.findViewById(R.id.tv_sales_percent);
+        btnDeleteFile         = view.findViewById(R.id.btn_delete_file);
 
         // Bundle에서 프로젝트 ID 읽기
         if (getArguments() != null) {
@@ -288,6 +295,7 @@ public class ProjectPageFragment extends Fragment {
                 // 탭 전환 중에는 저장 생략 (전환 중 발생하는 콜백 무시)
                 if (!isSwitching && pos > 0) {
                     fileList.get(selectedIndex).setCategory((String) parent.getItemAtPosition(pos));
+                    saveProjectToServer();  // PUT /projects/{id} 호출하여 status 변경 반영
                 }
             }
             @Override
@@ -388,6 +396,55 @@ public class ProjectPageFragment extends Fragment {
 
         // 썸네일 클릭 → 카메라/갤러리 선택 다이얼로그
         folderImage.setOnClickListener(v -> showImagePickerDialog());
+
+        // 파일 삭제 버튼 → 확인 다이얼로그 → DELETE /projects/{id}
+        if (btnDeleteFile != null) {
+            btnDeleteFile.setOnClickListener(v -> confirmAndDeleteProject());
+        }
+    }
+
+    /** 확인 다이얼로그 표시 후 OK 시 DELETE 호출 */
+    private void confirmAndDeleteProject() {
+        if (projectId == null) {
+            Toast.makeText(requireContext(), "프로젝트 ID가 없어 삭제할 수 없습니다.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new AlertDialog.Builder(requireContext())
+                .setTitle("프로젝트 삭제")
+                .setMessage("이 프로젝트를 정말 삭제하시겠습니까? 모든 차시 데이터가 함께 삭제됩니다.")
+                .setNegativeButton("취소", null)
+                .setPositiveButton("삭제", (dialog, which) -> deleteProjectFromServer())
+                .show();
+    }
+
+    /** DELETE /projects/{id} 호출 후 성공 시 이전 화면으로 복귀 */
+    private void deleteProjectFromServer() {
+        RetrofitClient.getApi(requireContext())
+                .deleteProject(projectId)
+                .enqueue(new Callback<com.google.gson.JsonObject>() {
+                    @Override
+                    public void onResponse(Call<com.google.gson.JsonObject> call,
+                                           Response<com.google.gson.JsonObject> resp) {
+                        if (!isAdded()) return;
+                        if (resp.isSuccessful()) {
+                            Toast.makeText(requireContext(), "삭제 완료", Toast.LENGTH_SHORT).show();
+                            // 프로젝트 목록으로 복귀
+                            if (getParentFragmentManager().getBackStackEntryCount() > 0) {
+                                getParentFragmentManager().popBackStack();
+                            }
+                        } else {
+                            Toast.makeText(requireContext(),
+                                    "삭제 실패 (HTTP " + resp.code() + ")",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<com.google.gson.JsonObject> call, Throwable t) {
+                        if (isAdded())
+                            Toast.makeText(requireContext(), "삭제 실패: 네트워크 오류", Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 
     /**
@@ -474,6 +531,12 @@ public class ProjectPageFragment extends Fragment {
         fileName.setText(file.getProjectName() != null ? file.getProjectName() : "");
         calender.setText(file.getDate() != null ? file.getDate() : today());
         etPrice.setText(file.getPrice() > 0 ? String.valueOf((int) file.getPrice()) : "");
+        etQuantity.setText(file.getQuantity() > 0 ? String.valueOf(file.getQuantity()) : "");
+        etRetailPrice.setText(file.getSellingPrice() > 0
+                ? String.valueOf(file.getSellingPrice()) : "");
+        etManufacturer.setText(file.getVendorName() != null ? file.getVendorName() : "");
+        etSeller.setText(file.getPlatformName() != null ? file.getPlatformName() : "");
+        etCommission.setText(file.getFeeRate() > 0 ? String.valueOf(file.getFeeRate()) : "");
         etSoldQuantity.setText(file.getSoldQuantity() > 0
                 ? String.valueOf(file.getSoldQuantity()) : "");
         etTargetQuantity.setText(file.getTargetQuantity() > 0
@@ -554,7 +617,9 @@ public class ProjectPageFragment extends Fragment {
 
     /**
      * GET /projects/{id} — 서버에서 프로젝트 데이터를 로드해 UI에 반영한다.
-     * 프로젝트명, 카테고리(status), 이미지 목록을 복원한다.
+     * 프로젝트명, 카테고리(status), 차시 목록(simulations[])을 복원한다.
+     * 각 차시는 ProjectFile로 변환되고, 차시별 상세 데이터(vendor_name, unit_cost 등)는
+     * GET /simulations/{id} 별도 호출로 채워진다.
      */
     private void loadProjectFromServer() {
         RetrofitClient.getApi(requireContext())
@@ -565,25 +630,53 @@ public class ProjectPageFragment extends Fragment {
                         if (!isAdded() || response.body() == null) return;
                         ProjectResponse project = response.body();
 
-                        // 프로젝트명 반영
-                        if (project.name != null) {
-                            fileList.get(selectedIndex).setProjectName(project.name);
-                            isSwitching = true;
-                            fileName.setText(project.name);
-                            isSwitching = false;
+                        // 카테고리(status) 반영 (어댑터에 동일 항목이 있을 때만)
+                        String projectStatus = project.status;
+
+                        // 차시(simulations[]) → fileList 재구성
+                        fileList.clear();
+                        if (project.simulations == null || project.simulations.isEmpty()) {
+                            // 시뮬레이션 없는 프로젝트: 빈 1차시
+                            ProjectFile file = new ProjectFile(1, project.name, projectStatus, today());
+                            fileList.add(file);
+                        } else {
+                            for (int i = 0; i < project.simulations.size(); i++) {
+                                ProjectResponse.SimulationSummary s = project.simulations.get(i);
+                                ProjectFile file = new ProjectFile(
+                                        i + 1,
+                                        project.name,
+                                        projectStatus,
+                                        s.createdAt != null ? formatDate(s.createdAt) : today()
+                                );
+                                file.setServerId(s.id);  // simulation id 보관
+                                // 응답에 직접 있는 필드들 우선 채움
+                                if (s.quantity != null) file.setQuantity(s.quantity);
+                                if (s.sellingPrice != null) file.setSellingPrice(s.sellingPrice);
+                                if (s.targetQuantity != null) file.setTargetQuantity(s.targetQuantity);
+                                if (s.actualQuantity != null) file.setSoldQuantity(s.actualQuantity);
+                                fileList.add(file);
+                            }
                         }
 
-                        // 카테고리(status) 반영
-                        if (project.status != null) {
-                            fileList.get(selectedIndex).setCategory(project.status);
+                        // 첫 번째 차시로 전환 + 탭 다시 그림
+                        switchChasi(0);
+
+                        // 카테고리 Spinner 별도 갱신 (어댑터 항목 매칭)
+                        if (projectStatus != null) {
                             ArrayAdapter adapter = (ArrayAdapter) spinnerCategory.getAdapter();
                             if (adapter != null) {
-                                int pos = adapter.getPosition(project.status);
+                                int pos = adapter.getPosition(projectStatus);
                                 if (pos >= 0) spinnerCategory.setSelection(pos);
                             }
                         }
 
-                        // 서버 이미지 목록 복원
+                        // 각 차시의 상세 데이터(vendor_name, unit_cost 등) fetch
+                        for (int i = 0; i < fileList.size(); i++) {
+                            String simId = fileList.get(i).getServerId();
+                            if (simId != null) loadSimulationDetailForChasi(i, simId);
+                        }
+
+                        // 서버 이미지 — 백엔드 응답에 없을 수도 있으니 안전 처리
                         if (project.images != null) {
                             photoList.clear();
                             photoImageIds.clear();
@@ -604,6 +697,57 @@ public class ProjectPageFragment extends Fragment {
     }
 
     /**
+     * GET /simulations/{simulation_id} 호출하여 한 차시의 상세 데이터(vendor_name,
+     * platform_plan, unit_cost, fee_rate 등)를 받아 ProjectFile에 저장.
+     * 현재 보고 있는 차시라면 EditText에도 즉시 반영.
+     */
+    private void loadSimulationDetailForChasi(int chasiIndex, String simulationId) {
+        RetrofitClient.getApi(requireContext())
+                .getSimulation(simulationId)
+                .enqueue(new Callback<com.example.creator_flow.model.SimulationDetailDto>() {
+                    @Override
+                    public void onResponse(Call<com.example.creator_flow.model.SimulationDetailDto> call,
+                                           Response<com.example.creator_flow.model.SimulationDetailDto> resp) {
+                        if (!isAdded() || resp.body() == null) return;
+                        if (chasiIndex >= fileList.size()) return;
+                        com.example.creator_flow.model.SimulationDetailDto sim = resp.body();
+                        ProjectFile file = fileList.get(chasiIndex);
+
+                        if (sim.unitCost != null) file.setPrice(sim.unitCost);
+                        if (sim.quantity != null) file.setQuantity(sim.quantity);
+                        if (sim.sellingPrice != null) file.setSellingPrice(sim.sellingPrice);
+                        if (sim.vendorName != null) file.setVendorName(sim.vendorName);
+                        if (sim.platformPlan != null) file.setPlatformName(sim.platformPlan);
+                        if (sim.feeRate != null) file.setFeeRate(sim.feeRate);
+                        if (sim.targetQuantity != null) file.setTargetQuantity(sim.targetQuantity);
+                        if (sim.actualQuantity != null) file.setSoldQuantity(sim.actualQuantity);
+
+                        // 현재 보고 있는 차시면 EditText들 즉시 갱신
+                        if (chasiIndex == selectedIndex) switchChasi(chasiIndex);
+                        updateChart();
+                    }
+
+                    @Override
+                    public void onFailure(Call<com.example.creator_flow.model.SimulationDetailDto> call,
+                                          Throwable t) {
+                        // 무시: 해당 차시의 상세 데이터만 비어있게 됨
+                    }
+                });
+    }
+
+    /** ISO8601 created_at("2025-04-01T10:23:45") → "Apr 1, 2025" 표시용 변환 */
+    private String formatDate(String iso) {
+        try {
+            java.text.SimpleDateFormat inFmt =
+                    new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+            java.util.Date d = inFmt.parse(iso.length() > 19 ? iso.substring(0, 19) : iso);
+            return new java.text.SimpleDateFormat("MMM d, yyyy", Locale.US).format(d);
+        } catch (Exception e) {
+            return iso;
+        }
+    }
+
+    /**
      * PUT /projects/{id} — 현재 프로젝트명과 카테고리를 서버에 저장한다.
      * 프로젝트명 TextWatcher에서 debounce 없이 호출되므로,
      * 입력이 끝날 때마다 저장된다 (추후 debounce 적용 권장).
@@ -611,10 +755,12 @@ public class ProjectPageFragment extends Fragment {
     private void saveProjectToServer() {
         if (projectId == null) return;
         ProjectFile current = fileList.get(selectedIndex);
+        // 백엔드 PUT /projects/{id}는 name + status 모두 query param으로 요구.
+        // 하나라도 null이면 백엔드가 422 반환하므로 빈 문자열로 대체.
+        String name = current.getProjectName() != null ? current.getProjectName() : "";
+        String status = current.getCategory() != null ? current.getCategory() : "";
         RetrofitClient.getApi(requireContext())
-                .updateProject(projectId, new UpdateProjectRequest(
-                        current.getProjectName(),
-                        current.getCategory()))
+                .updateProject(projectId, name, status)
                 .enqueue(new Callback<ProjectResponse>() {
                     @Override
                     public void onResponse(Call<ProjectResponse> call, Response<ProjectResponse> response) { }

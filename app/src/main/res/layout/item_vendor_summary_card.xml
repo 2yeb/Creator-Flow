@@ -17,13 +17,15 @@
         android:orientation="horizontal"
         android:layout_marginBottom="8dp">
 
-        <View
+        <ImageView
             android:id="@+id/vendor_color_box"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:layout_marginEnd="8dp"
             android:background="@drawable/rounded_solid"
-            android:backgroundTint="#1A237E" />
+            android:backgroundTint="#1A237E"
+            android:scaleType="centerInside"
+            android:contentDescription="업체 로고" />
 
         <TextView
             android:id="@+id/tv_vendor_name"

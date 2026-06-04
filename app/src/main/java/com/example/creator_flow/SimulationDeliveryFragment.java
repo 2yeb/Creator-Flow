@@ -1,34 +1,46 @@
 package com.example.creator_flow;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import com.example.creator_flow.model.SimulationData;
+
 public class SimulationDeliveryFragment extends Fragment {
 
-    private String modelType = "Business";
+    // ===== 모델 타입 인자 (Business / Fan-art) =====
+    private static final String ARG_MODEL_TYPE = "model_type";
 
-    // 각 카드뷰 그룹별 선택된 인덱스 (-1은 미선택)
-    private int selectedDeliveryIndex = -1; // 1. 택배 그룹 (총 5개 박스)
-    private int selectedFeeIndex = -1;      // 2. 배송비 그룹 (총 2개 박스)
-    private int selectedPackingIndex = -1;  // 3. 포장재 그룹 (총 4개 박스)
-
-    // 실제 클릭을 감지하고 배경이 바뀔 박스(View) 레이아웃 배열
-    private LinearLayout[] deliveryBoxes;
-    private LinearLayout[] feeBoxes;
-    private TextView[] packingBoxes;
-
-    private ImageView nextButton;
+    // 라디오 그룹별 현재 선택된 View
+    private View selectedDelivery;
+    private View selectedFee;
+    private View selectedPackaging;
+    private View nextButton;
+    /** 현재 화면이 표현 중인 모델 타입 (다음 화면으로 전달) */
+    private String currentModelType = SimulationDetail1Fragment.MODEL_BUSINESS;
 
     public SimulationDeliveryFragment() {}
+
+    public static SimulationDeliveryFragment newInstance() {
+        return newInstance(SimulationDetail1Fragment.MODEL_BUSINESS);
+    }
+
+    public static SimulationDeliveryFragment newInstance(String modelType) {
+        SimulationDeliveryFragment fragment = new SimulationDeliveryFragment();
+        Bundle args = new Bundle();
+        args.putString(ARG_MODEL_TYPE, modelType);
+        fragment.setArguments(args);
+        return fragment;
+    }
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -40,115 +52,215 @@ public class SimulationDeliveryFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        if (getArguments() != null) {
-            modelType = getArguments().getString("model_type", "Business");
-        }
-
-        // 뒤로가기 및 다음 버튼 초기화
+        // 뒤로가기
         view.findViewById(R.id.btn_back).setOnClickListener(v ->
                 requireActivity().getOnBackPressedDispatcher().onBackPressed());
 
+        // 다음 버튼 (3개 선택 완료 시 표시) → SimulationDetail2Fragment 이동
         nextButton = view.findViewById(R.id.btn_next);
-        if (nextButton != null) {
-            nextButton.setVisibility(View.GONE);
-            nextButton.setOnClickListener(v -> goToNextStep());
+        nextButton.setOnClickListener(v -> goToDetail2());
+
+        // 모델 헤더: Business / Fan-art 분기
+        currentModelType = getArguments() != null
+                ? getArguments().getString(ARG_MODEL_TYPE, SimulationDetail1Fragment.MODEL_BUSINESS)
+                : SimulationDetail1Fragment.MODEL_BUSINESS;
+        TextView tvModelHeader = view.findViewById(R.id.tv_model_header);
+        if (tvModelHeader != null) {
+            tvModelHeader.setText(
+                    SimulationDetail1Fragment.MODEL_FANART.equals(currentModelType)
+                            ? "Fan-art Model" : "Business Model");
         }
 
-        // ==========================================
-        // 그룹 1. 택배 박스 리스트 (실제 감싸고 있는 레이아웃 ID 매핑)
-        // ==========================================
-        deliveryBoxes = new LinearLayout[]{
-                view.findViewById(R.id.post_office),    // 우체국 택배
-                view.findViewById(R.id.convenious_store),   // 편의점 택배
-                view.findViewById(R.id.convenious_half),     // 편의점 반값 택배
-                view.findViewById(R.id.post_basic),     // 방문 택배
-                view.findViewById(R.id.postal)     // 준등기 / 우편
-        };
-        setupGroupClickListeners(deliveryBoxes, 1);
-
-        // ==========================================
-        // 그룹 2. 배송비 박스 리스트 (실제 감싸고 있는 레이아웃 ID 매핑)
-        // ==========================================
-        feeBoxes = new LinearLayout[]{
-                view.findViewById(R.id.fee_include),    // 구매자 부담
-                view.findViewById(R.id.fee_exclude)     // 판매자 택배
-        };
-        setupGroupClickListeners(feeBoxes, 2);
-
-        // ==========================================
-        // 그룹 3. 포장재 박스 리스트 (실제 감싸고 있는 레이아웃 ID 매핑)
-        // ==========================================
-        packingBoxes = new TextView[]{
-                view.findViewById(R.id.pack_opp_tv),       // OPP 봉투 레이아웃
-                view.findViewById(R.id.pack_zipper_tv),    // 지퍼백 레이아웃
-                view.findViewById(R.id.pack_none_tv),      // 없음 레이아웃
-                view.findViewById(R.id.pack_custom_tv)     // 직접 입력 레이아웃
-        };
-        setupGroupClickListeners(packingBoxes, 3);
+        setupDeliveryRadio(view);
+        setupFeeRadio(view);
+        setupPackagingRadio(view);
     }
 
-    /**
-     * 박스(레이아웃) 배열에 클릭 리스너를 달아주는 함수
-     */
-    private void setupGroupClickListeners(View[] boxes, int groupType) {
-        for (int i = 0; i < boxes.length; i++) {
-            if (boxes[i] == null) continue;
-
-            final int index = i;
-            boxes[i].setOnClickListener(v -> {
-                if (groupType == 1) {
-                    selectedDeliveryIndex = index;
-                    updateGroupUI(boxes, selectedDeliveryIndex);
-                } else if (groupType == 2) {
-                    selectedFeeIndex = index;
-                    updateGroupUI(boxes, selectedFeeIndex);
-                } else if (groupType == 3) {
-                    selectedPackingIndex = index;
-                    updateGroupUI(boxes, selectedPackingIndex);
-                }
-
-                // 세 카드뷰가 모두 선택되었는지 매번 검사해서 다음 버튼 노출
-                checkAllCategoriesSelected();
+    // ===== 택배 라디오 =====
+    private void setupDeliveryRadio(View root) {
+        int[] ids = {
+                R.id.opt_post,
+                R.id.opt_cvs,
+                R.id.opt_cvs_half,
+                R.id.opt_visit,
+                R.id.opt_post_mail
+        };
+        for (int id : ids) {
+            View row = root.findViewById(id);
+            row.setOnClickListener(v -> {
+                if (selectedDelivery != null) selectedDelivery.setSelected(false);
+                v.setSelected(true);
+                selectedDelivery = v;
+                updateNextButton();
             });
         }
     }
 
-    /**
-     * 클릭된 박스 영역만 selected 상태를 true로 켜고 나머지는 끄는 함수
-     */
-    private void updateGroupUI(View[] boxes, int selectedIndex) {
-        for (int i = 0; i < boxes.length; i++) {
-            if (boxes[i] != null) {
-                boxes[i].setSelected(i == selectedIndex);
+    // ===== 배송비 라디오 =====
+    private void setupFeeRadio(View root) {
+        View feeBuyer = root.findViewById(R.id.fee_buyer);
+        View feeSeller = root.findViewById(R.id.fee_seller);
+        View buyerInputRow = root.findViewById(R.id.fee_buyer_input_row);
+        EditText buyerAmount = root.findViewById(R.id.et_fee_buyer_amount);
+
+        feeBuyer.setOnClickListener(v -> {
+            if (selectedFee != null) selectedFee.setSelected(false);
+            v.setSelected(true);
+            selectedFee = v;
+            // 구매자 부담 → 금액 입력 칸 노출 + 포커스
+            buyerInputRow.setVisibility(View.VISIBLE);
+            buyerAmount.requestFocus();
+            showKeyboard(buyerAmount);
+            updateNextButton();
+        });
+
+        feeSeller.setOnClickListener(v -> {
+            if (selectedFee != null) selectedFee.setSelected(false);
+            v.setSelected(true);
+            selectedFee = v;
+            // 판매자 택배 → 금액 입력 칸 숨김
+            buyerInputRow.setVisibility(View.GONE);
+            hideKeyboard(v);
+            updateNextButton();
+        });
+
+        // EditText 직접 탭해도 구매자 부담 행 선택 처리
+        buyerAmount.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus && selectedFee != feeBuyer) {
+                if (selectedFee != null) selectedFee.setSelected(false);
+                feeBuyer.setSelected(true);
+                selectedFee = feeBuyer;
+                updateNextButton();
+            }
+        });
+    }
+
+    // ===== 포장재 라디오 + 직접 입력 =====
+    private void setupPackagingRadio(View root) {
+        TextView opp = root.findViewById(R.id.pkg_opp);
+        TextView zipper = root.findViewById(R.id.pkg_zipper);
+        TextView none = root.findViewById(R.id.pkg_none);
+        TextView custom = root.findViewById(R.id.pkg_custom);
+        EditText customInput = root.findViewById(R.id.pkg_custom_input);
+
+        TextView[] chips = {opp, zipper, none, custom};
+        for (TextView chip : chips) {
+            chip.setOnClickListener(v -> {
+                if (selectedPackaging != null) selectedPackaging.setSelected(false);
+                v.setSelected(true);
+                selectedPackaging = v;
+
+                // 직접 입력 칩 → EditText 표시 + 포커스
+                if (v.getId() == R.id.pkg_custom) {
+                    customInput.setVisibility(View.VISIBLE);
+                    customInput.requestFocus();
+                    showKeyboard(customInput);
+                } else {
+                    customInput.setVisibility(View.GONE);
+                    hideKeyboard(v);
+                }
+                updateNextButton();
+            });
+        }
+
+        // EditText 직접 탭해도 직접 입력 칩 선택 처리
+        customInput.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                if (selectedPackaging != null && selectedPackaging != custom) {
+                    selectedPackaging.setSelected(false);
+                }
+                custom.setSelected(true);
+                selectedPackaging = custom;
+                updateNextButton();
+            }
+        });
+    }
+
+    /** 3개 섹션 모두 선택돼야 다음 버튼 노출 */
+    private void updateNextButton() {
+        if (nextButton == null) return;
+        boolean allSelected = selectedDelivery != null
+                && selectedFee != null
+                && selectedPackaging != null;
+        nextButton.setVisibility(allSelected ? View.VISIBLE : View.GONE);
+    }
+
+    private void goToDetail2() {
+        // 선택값 저장
+        if (selectedDelivery instanceof View && selectedDelivery != null) {
+            TextView label = findOptionLabel((View) selectedDelivery);
+            SimulationData.deliveryMethod = (label != null) ? label.getText().toString() : null;
+        }
+        if (selectedFee != null) {
+            TextView label = findOptionLabel((View) selectedFee);
+            SimulationData.shippingFeeType = (label != null) ? label.getText().toString() : null;
+
+            // 구매자 부담이면 입력한 금액도 저장 (블랭크/invalid 시 0)
+            if (selectedFee.getId() == R.id.fee_buyer) {
+                View root = getView();
+                if (root != null) {
+                    EditText amount = root.findViewById(R.id.et_fee_buyer_amount);
+                    String text = (amount != null) ? amount.getText().toString().trim() : "";
+                    try {
+                        SimulationData.shippingFeeBuyer = text.isEmpty() ? 0 : Integer.parseInt(text);
+                    } catch (NumberFormatException e) {
+                        SimulationData.shippingFeeBuyer = 0;
+                    }
+                }
+            } else {
+                // 판매자 택배 → 구매자는 0원 (판매자가 다 부담)
+                SimulationData.shippingFeeBuyer = 0;
             }
         }
-    }
-
-    private void checkAllCategoriesSelected() {
-        if (selectedDeliveryIndex != -1 && selectedFeeIndex != -1 && selectedPackingIndex != -1) {
-            if (nextButton != null) nextButton.setVisibility(View.VISIBLE);
-        } else {
-            if (nextButton != null) nextButton.setVisibility(View.GONE);
+        if (selectedPackaging instanceof TextView) {
+            // 직접 입력이면 EditText 값 사용, 아니면 칩 텍스트
+            View root = getView();
+            if (selectedPackaging.getId() == R.id.pkg_custom && root != null) {
+                EditText input = root.findViewById(R.id.pkg_custom_input);
+                String custom = (input != null) ? input.getText().toString().trim() : "";
+                SimulationData.packagingType = custom.isEmpty() ? "직접 입력" : custom;
+            } else {
+                SimulationData.packagingType = ((TextView) selectedPackaging).getText().toString();
+            }
         }
-    }
-
-    private void goToNextStep() {
-        if (selectedDeliveryIndex == -1 || selectedFeeIndex == -1 || selectedPackingIndex == -1) return;
-
-        Fragment nextFragment;
-        if ("Business".equals(modelType)) {
-            nextFragment = new SimulationBusinessFragment();
-        } else {
-            nextFragment = new SimulationConfirmFragment();
-        }
-
-        Bundle args = new Bundle();
-        args.putString("model_type", modelType);
-        nextFragment.setArguments(args);
 
         getParentFragmentManager().beginTransaction()
-                .replace(R.id.main_fragment, nextFragment)
+                .replace(R.id.main_fragment,
+                        SimulationDetail2Fragment.newInstance(currentModelType))
                 .addToBackStack(null)
                 .commit();
+    }
+
+    /** 택배/배송비 행 안의 옵션 명 TextView를 찾기 (DeliveryOptionText 스타일 사용) */
+    private TextView findOptionLabel(View row) {
+        if (row instanceof android.view.ViewGroup) {
+            android.view.ViewGroup vg = (android.view.ViewGroup) row;
+            for (int i = 0; i < vg.getChildCount(); i++) {
+                View child = vg.getChildAt(i);
+                if (child instanceof TextView) {
+                    TextView tv = (TextView) child;
+                    // weight=1로 길게 늘어난 옵션 명 TextView 식별
+                    android.view.ViewGroup.LayoutParams lp = tv.getLayoutParams();
+                    if (lp instanceof android.widget.LinearLayout.LayoutParams
+                            && ((android.widget.LinearLayout.LayoutParams) lp).weight > 0) {
+                        return tv;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    // ===== 키보드 =====
+    private void showKeyboard(View target) {
+        InputMethodManager imm = (InputMethodManager) requireContext()
+                .getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) imm.showSoftInput(target, InputMethodManager.SHOW_IMPLICIT);
+    }
+
+    private void hideKeyboard(View anyView) {
+        InputMethodManager imm = (InputMethodManager) requireContext()
+                .getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) imm.hideSoftInputFromWindow(anyView.getWindowToken(), 0);
     }
 }

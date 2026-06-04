@@ -27,4 +27,75 @@
         <item name="android:textSize">12sp</item>
     </style>
 
+    <!-- ===== Delivery 화면 공통 스타일 ===== -->
+
+    <!-- 택배/배송비 선택 행 (spinner와 동일한 라운딩/높이/패딩) -->
+    <style name="DeliveryOptionRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">42dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:background">@drawable/delivery_option_bg</item>
+        <item name="android:paddingStart">20dp</item>
+        <item name="android:paddingEnd">20dp</item>
+        <item name="android:layout_marginBottom">8dp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="DeliveryOptionRowLast" parent="DeliveryOptionRow">
+        <item name="android:layout_marginBottom">0dp</item>
+    </style>
+
+    <!-- 체크 아이콘 -->
+    <style name="DeliveryCheckIcon">
+        <item name="android:layout_width">22dp</item>
+        <item name="android:layout_height">22dp</item>
+        <item name="android:src">@drawable/ic_delivery_check</item>
+        <item name="android:duplicateParentState">true</item>
+    </style>
+
+    <!-- 행 안의 옵션 명 텍스트 (좌측 flex) -->
+    <style name="DeliveryOptionText">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginStart">14dp</item>
+        <item name="android:textColor">@color/text_color</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <!-- 행 우측 가격 텍스트 -->
+    <style name="DeliveryPriceText">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:text">가격</item>
+        <item name="android:textColor">#7A7A7A</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+
+    <!-- 요약 화면 그룹 박스 (라임 stroke + 흰 배경) -->
+    <style name="SummaryGroup">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:background">@drawable/summary_group_bg</item>
+        <item name="android:padding">18dp</item>
+        <item name="android:layout_marginBottom">15dp</item>
+    </style>
+
+    <!-- 포장재 칩 (택배 행과 같은 라운딩, 폭은 wrap) -->
+    <style name="PackagingChip">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">30dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/packaging_chip_bg</item>
+        <item name="android:paddingStart">15dp</item>
+        <item name="android:paddingEnd">15dp</item>
+        <item name="android:textColor">@color/text_color</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
 </resources>

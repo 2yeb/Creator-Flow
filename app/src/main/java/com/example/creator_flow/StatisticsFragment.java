@@ -168,30 +168,41 @@ public class StatisticsFragment extends Fragment {
             item.setId(targetId);
         }
 
-        UpdateProjectRequest request = new UpdateProjectRequest(item.getName(), item.getStatus());
+        RetrofitClient.getApi(requireContext())
+                .updateProject(
+                        targetId,
+                        item.getName(),
+                        item.getStatus()
+                )
+                .enqueue(new Callback<com.example.creator_flow.model.ProjectResponse>() {
+                    @Override
+                    public void onResponse(
+                            @NonNull Call<com.example.creator_flow.model.ProjectResponse> call,
+                            @NonNull Response<com.example.creator_flow.model.ProjectResponse> response) {
 
-        RetrofitClient.getApi(requireContext()).updateProject(targetId, request).enqueue(new Callback<com.example.creator_flow.model.ProjectResponse>() {
-            @Override
-            public void onResponse(@NonNull Call<com.example.creator_flow.model.ProjectResponse> call, @NonNull Response<com.example.creator_flow.model.ProjectResponse> response) {
-                if (!isAdded() || getContext() == null) return;
+                        if (!isAdded() || getContext() == null) return;
 
-                if (response.isSuccessful()) {
-                    Toast.makeText(getContext(), "프로젝트가 반영되었습니다.", Toast.LENGTH_SHORT).show();
-                    fetchProjectsFromServer();
-                } else {
-                    Toast.makeText(getContext(), "저장에 실패했습니다.", Toast.LENGTH_SHORT).show();
-                    removeFailedItemFromAdapter(item.getStatus(), position);
-                }
-            }
+                        if (response.isSuccessful()) {
+                            Toast.makeText(getContext(), "프로젝트가 반영되었습니다.", Toast.LENGTH_SHORT).show();
+                            fetchProjectsFromServer();
+                        } else {
+                            Toast.makeText(getContext(), "저장에 실패했습니다.", Toast.LENGTH_SHORT).show();
+                            removeFailedItemFromAdapter(item.getStatus(), position);
+                        }
+                    }
 
-            @Override
-            public void onFailure(@NonNull Call<com.example.creator_flow.model.ProjectResponse> call, @NonNull Throwable t) {
-                if (isAdded() && getContext() != null) {
-                    Toast.makeText(getContext(), "네트워크 오류로 저장 실패", Toast.LENGTH_SHORT).show();
-                }
-                removeFailedItemFromAdapter(item.getStatus(), position);
-            }
-        });
+                    @Override
+                    public void onFailure(
+                            @NonNull Call<com.example.creator_flow.model.ProjectResponse> call,
+                            @NonNull Throwable t) {
+
+                        if (isAdded() && getContext() != null) {
+                            Toast.makeText(getContext(), "네트워크 오류로 저장 실패", Toast.LENGTH_SHORT).show();
+                        }
+
+                        removeFailedItemFromAdapter(item.getStatus(), position);
+                    }
+                });
     }
     private void removeFailedItemFromAdapter(String status, int position) {
         if (status.equals("planning") && planningAdapter != null) planningAdapter.removeItem(position);
