@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <!--홈 화면 정가계산기 틀-->
+    <corners android:radius="10dp"/>
     <stroke
         android:color="@color/outline"
-        android:width="2dp"
-        />
-    <solid android:color="#DBF194"/>
-    <corners android:radius="26dp"/>
+        android:width="1dp"/>
+    <solid android:color="@color/buttoncolor1"/>
 </shape>

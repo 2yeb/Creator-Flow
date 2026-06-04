@@ -3,7 +3,7 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="background">#F5FAE0</color> <!--바탕 기본 컬러-->
-    <color name="buttoncolor1">#D4EE90</color> <!--버튼 색상1-->
+    <color name="buttoncolor1">#D4EE90</color> <!--버튼 색상1, 그룹 초록색-->
     <color name="outline">#B8E060</color> <!--외각선-->
     <color name="bottom_navigation">#8DC84A</color> <!--바텀 네비게이션 선택 색상-->
     <color name="text_color">#313131</color> <!--텍스트 컬러-->
@@ -15,4 +15,7 @@
     <color name="folder_purple">#D4B2FF</color> <!--폴더 보라색-->
     <color name="folder_purple_back">#E3CDFF</color> <!--폴더 보라 뒷 배경 색상-->
     <color name="project_page_graph">#7BB4E5</color> <!-- 그래프 색상 -->
+    <color name="group_yellow">#FAE8A0</color> <!--그룹 노란색-->
+    <color name="group_pink">#F4C0C0</color> <!--그룹 핑크색-->
+    <color name="group_blue">#8FA8D8</color> <!--그룹 파란색-->
 </resources>
