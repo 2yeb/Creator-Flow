@@ -18,17 +18,13 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.creator_flow.network.ApiService;
 import com.example.creator_flow.network.RetrofitClient;
-import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
-import retrofit2.Retrofit;
-import retrofit2.converter.gson.GsonConverterFactory;
 
 public class GroupListFragment extends Fragment {
     private RecyclerView groupRecyclerView;
@@ -59,7 +55,7 @@ public class GroupListFragment extends Fragment {
         }
 
         groupAdapter = new GroupAdapter(groupList, project -> {
-            navigateToProjectDetail(project.getId());
+            navigateToProjectPage(project.getId());
         });
         groupRecyclerView.setAdapter(groupAdapter);
 
@@ -86,7 +82,7 @@ public class GroupListFragment extends Fragment {
                     for (int i = 0; i < networkGroups.size(); i++) {
                         GroupListResponse res = networkGroups.get(i);
 
-                        // 예시 테마 색상 설정 (서버에 색상 값이 없다면 순서대로 임의 지정 가능)
+                        // 테마 색상 설정
                         int colorResId = R.color.buttoncolor1;
                         if (i % 4 == 0) colorResId = R.color.group_yellow;
                         else if (i % 4 == 1) colorResId = R.color.group_pink;
@@ -220,8 +216,17 @@ public class GroupListFragment extends Fragment {
         editGroupname.requestFocus();
     }
 
-    private void navigateToProjectDetail(String projectId) {
-        Toast.makeText(getContext(), "프로젝트 상세 ID [" + projectId + "] 화면으로 이동합니다.", Toast.LENGTH_SHORT).show();
+    private void navigateToProjectPage(String projectId) {
+        // 1. ProjectPageFragment 인스턴스 생성
+        ProjectPageFragment projectPageFragment = ProjectPageFragment.newInstance(projectId);
+
+        // 2. FragmentTransaction을 사용하여 화면 전환
+        if (getActivity() != null) {
+            getActivity().getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.main_fragment, projectPageFragment)
+                    .addToBackStack(null) // 뒤로가기
+                    .commit();
+        }
     }
 
     private static class VerticalSpaceItemDecoration extends RecyclerView.ItemDecoration {

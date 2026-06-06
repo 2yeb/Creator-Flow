@@ -12,7 +12,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.creator_flow.databinding.FragmentStatisticsBinding;
-import com.example.creator_flow.model.UpdateProjectRequest;
 import com.example.creator_flow.network.RetrofitClient;
 
 import org.jetbrains.annotations.Nullable;
@@ -84,8 +83,15 @@ public class StatisticsFragment extends Fragment {
         ProjectStateAdapter.OnProjectActionListener projectActionListener = new ProjectStateAdapter.OnProjectActionListener() {
             @Override
             public void onProjectClick(ProjectItem item) {
-                if (isAdded() && getContext() != null) {
-                    Toast.makeText(getContext(), item.getName() + " 선택됨", Toast.LENGTH_SHORT).show();
+                // 1. ProjectPageFragment 인스턴스 생성
+                ProjectPageFragment projectPageFragment = ProjectPageFragment.newInstance(item.getId());
+
+                // 2. FragmentTransaction을 사용하여 화면 전환
+                if (getActivity() != null) {
+                    getActivity().getSupportFragmentManager().beginTransaction()
+                            .replace(R.id.main_fragment, projectPageFragment)
+                            .addToBackStack(null) // 뒤로가기
+                            .commit();
                 }
             }
 
@@ -114,7 +120,6 @@ public class StatisticsFragment extends Fragment {
      *  API 1: 서버에서 전체 프로젝트 목록을 조회 (GET /projects)
      */
     private void fetchProjectsFromServer() {
-        // 💡 Retrofit 고쳐짐: getApi(requireContext())를 호출하여 정상 연동
         RetrofitClient.getApi(requireContext()).getProjects().enqueue(new Callback<List<ProjectListResponse>>() {
             @Override
             public void onResponse(@NonNull Call<List<ProjectListResponse>> call, @NonNull Response<List<ProjectListResponse>> response) {
