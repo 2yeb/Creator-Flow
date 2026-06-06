@@ -173,11 +173,13 @@ public class StatisticsFragment extends Fragment {
             item.setId(targetId);
         }
 
+        // 2026-06 백엔드 업데이트로 PUT /projects/{id}는 JSON body(UpdateProjectRequest) 받음.
         RetrofitClient.getApi(requireContext())
                 .updateProject(
                         targetId,
-                        item.getName(),
-                        item.getStatus()
+                        new com.example.creator_flow.model.UpdateProjectRequest(
+                                item.getName(),
+                                item.getStatus())
                 )
                 .enqueue(new Callback<com.example.creator_flow.model.ProjectResponse>() {
                     @Override
