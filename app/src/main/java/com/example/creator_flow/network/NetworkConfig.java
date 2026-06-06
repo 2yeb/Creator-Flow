@@ -12,5 +12,5 @@ public class NetworkConfig {
      *
      * HTTP 사용 시 AndroidManifest.xml에 usesCleartextTraffic="true" 필요.
      */
-    public static final String BASE_URL = "https://student-disk-shank.ngrok-free.dev";
+    public static final String BASE_URL = "http://10.0.2.2:8000/";
 }
