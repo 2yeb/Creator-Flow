@@ -49,6 +49,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.creator_flow.model.ImageUploadResponse;
 import com.example.creator_flow.model.ProjectFile;
+import com.example.creator_flow.model.ProjectImageDto;
 import com.example.creator_flow.model.ProjectResponse;
 import com.example.creator_flow.model.SimulationDetailDto;
 import com.example.creator_flow.model.UpdateProjectRequest;
@@ -805,23 +806,10 @@ public class ProjectPageFragment extends Fragment {
                             }
                         }
 
-                        // 서버 이미지 — 백엔드 응답에 없을 수도 있으니 안전 처리
-                        // 백엔드는 project 단위로 이미지 저장. 차시별 분리 안 됨 → 일단 1차시에 디폴트로 부착.
-                        if (project.images != null) {
-                            photoList.clear();
-                            photoImageIds.clear();
-                            for (ProjectResponse.ProjectImage img : project.images) {
-                                photoList.add(Uri.parse(img.imageUrl));
-                                photoImageIds.add(img.imageId);
-                            }
-                            // 첫 번째 차시(현재 선택된 차시)의 ProjectFile에도 저장
-                            if (!fileList.isEmpty()) {
-                                ProjectFile firstFile = fileList.get(selectedIndex);
-                                firstFile.setPhotoUris(new ArrayList<>(photoList));
-                                firstFile.setPhotoImageIds(new ArrayList<>(photoImageIds));
-                            }
-                            refreshPhotoBox();
-                        }
+                        // 차시별 이미지 로드 — 2026-06-06 백엔드 추가 엔드포인트.
+                        // simulations[] 처리가 끝나서 각 ProjectFile.serverId가 설정된 상태이므로
+                        // simulation_id 기준으로 정확히 차시 매칭 가능.
+                        loadProjectImages();
                     }
 
                     @Override
@@ -830,6 +818,90 @@ public class ProjectPageFragment extends Fragment {
                             Toast.makeText(requireContext(), "프로젝트 로드 실패", Toast.LENGTH_SHORT).show();
                     }
                 });
+    }
+
+    /**
+     * GET /projects/{id}/images — 프로젝트의 모든 이미지를 받아 차시별로 분배.
+     *
+     * 2026-06-06 백엔드 업데이트로 추가된 엔드포인트. 응답에 simulation_id가 포함되어
+     * 어느 차시에 속한 이미지인지 알 수 있음 → 앱 재시작 후에도 차시별 사진이
+     * 정확히 그 차시로 복원됨.
+     *
+     * 호출 시점: loadProjectFromServer() 안에서 simulations[] 처리 직후
+     * (= 각 ProjectFile.serverId가 설정된 상태여야 매칭 가능).
+     */
+    private void loadProjectImages() {
+        if (projectId == null) return;
+        RetrofitClient.getApi(requireContext())
+                .getProjectImages(projectId, null)  // 전체 이미지 받아오기 (simulation_id 필터 X)
+                .enqueue(new Callback<List<ProjectImageDto>>() {
+                    @Override
+                    public void onResponse(Call<List<ProjectImageDto>> call,
+                                           Response<List<ProjectImageDto>> resp) {
+                        if (!isAdded() || resp.body() == null) return;
+                        distributeImagesToChasi(resp.body());
+                    }
+
+                    @Override
+                    public void onFailure(Call<List<ProjectImageDto>> call, Throwable t) {
+                        // 무시 — 이미지 복원만 안 되고 나머지 데이터는 정상 표시됨
+                        android.util.Log.w("ProjectPage",
+                                "이미지 목록 로드 실패: " + t.getMessage());
+                    }
+                });
+    }
+
+    /**
+     * 받아온 이미지를 simulation_id 기준으로 각 차시의 ProjectFile에 분배.
+     *
+     * - simulation_id가 차시의 serverId와 일치하면 그 차시에 attach.
+     * - simulation_id == null (어느 차시에도 안 묶인 옛날 이미지)이면 1차시에 fallback.
+     * - 매칭되는 차시를 못 찾으면 무시 (해당 차시가 삭제된 경우 등).
+     *
+     * 분배 후 현재 보고 있는 차시(selectedIndex) UI도 즉시 갱신.
+     */
+    private void distributeImagesToChasi(List<ProjectImageDto> images) {
+        // 각 차시의 사진 리스트 초기화 (loadProject로 새로 받은 상태이므로 비어있어야 함)
+        for (ProjectFile f : fileList) {
+            f.setPhotoUris(new ArrayList<>());
+            f.setPhotoImageIds(new ArrayList<>());
+        }
+
+        // simulation_id → 차시 인덱스 매칭
+        for (ProjectImageDto img : images) {
+            if (img == null || img.imageUrl == null) continue;
+
+            int targetIdx = -1;
+            if (img.simulationId != null) {
+                // serverId가 같은 차시 찾기
+                for (int i = 0; i < fileList.size(); i++) {
+                    if (img.simulationId.equals(fileList.get(i).getServerId())) {
+                        targetIdx = i;
+                        break;
+                    }
+                }
+            }
+            // simulation_id null 또는 매칭 실패 → 1차시(첫 번째 차시)로 fallback
+            if (targetIdx < 0 && !fileList.isEmpty()) targetIdx = 0;
+            if (targetIdx < 0) continue;
+
+            ProjectFile target = fileList.get(targetIdx);
+            // 차시당 최대 2개까지만 (refreshPhotoBox의 UI 제약과 일치)
+            if (target.getPhotoUris().size() >= 2) continue;
+
+            target.getPhotoUris().add(Uri.parse(img.imageUrl));
+            target.getPhotoImageIds().add(img.id);
+        }
+
+        // 현재 보고 있는 차시의 UI(photoList) 갱신
+        if (selectedIndex >= 0 && selectedIndex < fileList.size()) {
+            ProjectFile current = fileList.get(selectedIndex);
+            photoList.clear();
+            photoImageIds.clear();
+            photoList.addAll(current.getPhotoUris());
+            photoImageIds.addAll(current.getPhotoImageIds());
+            refreshPhotoBox();
+        }
     }
 
     /**

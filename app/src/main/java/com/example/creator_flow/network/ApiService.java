@@ -7,6 +7,7 @@ import com.example.creator_flow.model.PlatformDto;
 import com.example.creator_flow.model.PlatformPlanDto;
 import com.example.creator_flow.model.ProductOptionDto;
 import com.example.creator_flow.model.ProjectFromSimulationDto;
+import com.example.creator_flow.model.ProjectImageDto;
 import com.example.creator_flow.model.ProjectResponse;
 import com.example.creator_flow.model.SimulationDetailDto;
 import com.example.creator_flow.model.SimulationResultDto;
@@ -93,6 +94,18 @@ public interface ApiService {
     Call<JsonObject> deleteImage(
             @Path("id") String projectId,
             @Path("image_id") String imageId);
+
+    /**
+     * 프로젝트 이미지 목록 조회 (2026-06-06 백엔드 추가).
+     *
+     * @param projectId    프로젝트 UUID
+     * @param simulationId 옵션 — 특정 차시 이미지만 필터링. null이면 프로젝트 전체 이미지.
+     * @return order 오름차순으로 정렬된 이미지 목록
+     */
+    @GET("projects/{project_id}/images")
+    Call<List<ProjectImageDto>> getProjectImages(
+            @Path("project_id") String projectId,
+            @Query("simulation_id") String simulationId);
 
     // ============================================================
     // 시뮬레이션 - 조회
