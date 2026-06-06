@@ -16,17 +16,19 @@ public class NetworkConfig {
     public static final String BASE_URL = "https://student-disk-shank.ngrok-free.dev/";
 
     /**
-     * 시현용 영구 dev JWT 토큰. 백엔드 개발자가 발급 (test@gmail.com 유저).
-     * 만료: 1781088673 (Unix epoch)
-     * 사용처: RetrofitClient의 인터셉터가 모든 요청에 Authorization 헤더로 자동 첨부.
+     * 시현용 dev JWT 토큰. 보안상 비워서 GitHub에 푸시됨.
+     *
+     * 시현/로컬 실행 시:
+     *   - 백엔드 개발자에게 발급받은 토큰을 아래 빈 문자열에 넣어서 실행.
+     *   - 예: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+     *   - 만료된 토큰이면 재발급 받아서 교체.
+     *
+     * RetrofitClient의 인터셉터가 모든 요청에 Authorization 헤더로 자동 첨부.
      *
      * TODO 진짜 배포 시:
      *   - 로그인 흐름 추가 (POST /auth/login)
      *   - TokenManager.saveToken()으로 동적 저장
      *   - 이 상수는 삭제
      */
-    public static final String DEV_TOKEN =
-            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." +
-            "eyJzdWIiOiI3ODZkNTQ1MS1mMDk5LTRlZmUtOTc3OC1jNGFlYWMwYmIwYWIiLCJleHAiOjE3ODEwODg2NzN9." +
-            "N-UDxE6EUBnipQ74PHSvfxuFsYg2-YsUSwXY59_A7Hw";
+    public static final String DEV_TOKEN = "";   // 시현 시엔 토큰 박아넣기
 }
