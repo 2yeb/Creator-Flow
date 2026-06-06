@@ -10,7 +10,8 @@ import retrofit2.converter.gson.GsonConverterFactory;
 
 /**
  * Retrofit 싱글톤.
- * 모든 요청에 Authorization: Bearer {token} 헤더를 자동으로 추가한다.
+ * 시현 모드: 모든 요청에 {@link NetworkConfig#DEV_TOKEN}을 Authorization 헤더로 자동 첨부.
+ * TokenManager는 향후 로그인 흐름 추가 시 동적 토큰용으로 보존됨 (현재는 미사용).
  */
 public class RetrofitClient {
 
@@ -21,12 +22,14 @@ public class RetrofitClient {
             TokenManager tokenManager = TokenManager.getInstance(context);
 
             // JWT 토큰 자동 첨부 인터셉터
+            // 우선순위: TokenManager에 저장된 토큰 > NetworkConfig.DEV_TOKEN (시현용 기본값)
             OkHttpClient client = new OkHttpClient.Builder()
                     .addInterceptor(chain -> {
                         Request original = chain.request();
                         String token = tokenManager.getToken();
+                        if (token == null) token = NetworkConfig.DEV_TOKEN;
 
-                        Request request = (token != null)
+                        Request request = (token != null && !token.isEmpty())
                                 ? original.newBuilder()
                                     .header("Authorization", "Bearer " + token)
                                     .build()

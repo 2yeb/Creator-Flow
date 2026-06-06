@@ -17,6 +17,14 @@ import java.util.List;
  */
 public class SimulationData {
 
+    /**
+     * 기존 프로젝트에 차시(simulation)를 추가하는 모드일 때 그 프로젝트의 ID.
+     * - null = 새 프로젝트 만드는 모드 (기본 흐름)
+     * - non-null = 이 ID의 프로젝트에 차시 attach (ProjectPageFragment의 + 버튼에서 진입)
+     * 시뮬레이션 완료 시 POST /simulations 호출에 project_id로 같이 보냄.
+     */
+    public static String targetProjectId;
+
     // ===== 모델 =====
     public static String modelType;        // "Business" | "Fanart"
 
@@ -54,6 +62,7 @@ public class SimulationData {
     public static Integer estimatedCost;   // 예상 원가
 
     public static void reset() {
+        targetProjectId = null;
         modelType = null;
         goodsType = null;
         subType = null;

@@ -10,6 +10,7 @@ import com.example.creator_flow.model.ProjectFromSimulationDto;
 import com.example.creator_flow.model.ProjectResponse;
 import com.example.creator_flow.model.SimulationDetailDto;
 import com.example.creator_flow.model.SimulationResultDto;
+import com.example.creator_flow.model.UpdateProjectRequest;
 import com.example.creator_flow.model.VendorDto;
 import com.example.creator_flow.model.VendorProductDto;
 import com.google.gson.JsonObject;
@@ -18,6 +19,7 @@ import java.util.List;
 
 import okhttp3.MultipartBody;
 import retrofit2.Call;
+import retrofit2.http.Body;
 import retrofit2.http.DELETE;
 import retrofit2.http.GET;
 import retrofit2.http.Multipart;
@@ -37,28 +39,55 @@ public interface ApiService {
     Call<ProjectResponse> getProject(@Path("id") String projectId);
 
     /**
-     * 프로젝트 수정 — 백엔드는 FastAPI 기본 동작상 query parameter로 받음.
-     * {@code def update_project(project_id: str, name: str, status: str, ...)}
+     * 프로젝트 수정 — 백엔드는 Pydantic UpdateProjectRequest (JSON body) 받음.
+     * {@code def update_project(project_id, request: UpdateProjectRequest, ...)}
      */
     @PUT("projects/{id}")
     Call<ProjectResponse> updateProject(
             @Path("id") String projectId,
-            @Query("name") String name,
-            @Query("status") String status);
+            @Body UpdateProjectRequest body);
 
     /** 프로젝트 삭제 — 응답 바디: {"message": "삭제 완료"} */
     @DELETE("projects/{id}")
     Call<JsonObject> deleteProject(@Path("id") String projectId);
 
     // ============================================================
+    // 시뮬레이션 (차시) - 수정/삭제 (2026-06 백엔드 업데이트)
+    // ============================================================
+
+    /**
+     * 시뮬레이션(차시) 수정 — 사용자가 프로젝트 페이지 EditText에서 수정한 값 반영.
+     * 백엔드: PUT /simulations/{id}?quantity=...&selling_price=...&...
+     * 각 인자는 null 가능 (변경 안 할 필드는 보내지 말라는 뜻).
+     */
+    @PUT("simulations/{simulation_id}")
+    Call<SimulationDetailDto> updateSimulation(
+            @Path("simulation_id") String simulationId,
+            @Query("quantity") Integer quantity,
+            @Query("selling_price") Integer sellingPrice,
+            @Query("actual_quantity") Integer actualQuantity,
+            @Query("target_quantity") Integer targetQuantity);
+
+    /** 시뮬레이션(차시) 삭제 — DELETE /simulations/{id} */
+    @DELETE("simulations/{simulation_id}")
+    Call<JsonObject> deleteSimulation(@Path("simulation_id") String simulationId);
+
+    // ============================================================
     // 프로젝트 이미지
     // ============================================================
 
+    /**
+     * 이미지 업로드.
+     * 2026-06 백엔드 업데이트로 simulation_id 옵션 파라미터 추가 — 현재 보고 있는
+     * 차시의 simulation id를 함께 보내면 그 차시 소속 이미지로 저장됨.
+     * null이면 어느 차시에도 속하지 않은 프로젝트 단위 이미지가 됨.
+     */
     @Multipart
     @POST("projects/{id}/images")
     Call<ImageUploadResponse> uploadImage(
             @Path("id") String projectId,
-            @Part MultipartBody.Part image);
+            @Part MultipartBody.Part image,
+            @Query("simulation_id") String simulationId);
 
     @DELETE("projects/{id}/images/{image_id}")
     Call<JsonObject> deleteImage(
@@ -137,7 +166,13 @@ public interface ApiService {
             @Query("shipping_fee_buyer") int shippingFeeBuyer,
             @Query("shipping_type") String shippingType,
             @Query("selected_option_ids") String selectedOptionIds,
-            @Query("target_quantity") Integer targetQuantity);
+            @Query("target_quantity") Integer targetQuantity,
+            /**
+             * 기존 프로젝트에 차시 추가 모드일 때 그 프로젝트 ID 전달.
+             * null이면 별도 프로젝트 없는 simulation row만 생성됨 (이후
+             * POST /simulations/{simulation_id}/project로 새 프로젝트 만들 수 있음).
+             */
+            @Query("project_id") String projectId);
 
     /** 시뮬레이션 결과로 프로젝트 생성 */
     @POST("simulations/{simulation_id}/project")

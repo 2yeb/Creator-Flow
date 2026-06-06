@@ -40,6 +40,20 @@ public class SimulationBusinessFragment extends Fragment {
 
     private static final String ARG_MODEL_TYPE = "model_type";
 
+    /**
+     * ⚠️ 시현/GitHub 푸시 토글용 플래그.
+     *
+     * - {@code true} (현재 — 시현 모드): 확인 클릭 후 새 프로젝트의 ProjectPageFragment로 직접 이동.
+     *   ProjectFragment(프로젝트 목록) 미완성이라 우회.
+     *
+     * - {@code false} (정상 — GitHub 푸시용): 확인 후 ProjectFragment 목록으로 이동.
+     *   사용자가 목록에서 프로젝트 클릭하여 ProjectPageFragment 진입.
+     *
+     * GitHub 푸시 전에 이 값만 false로 바꾸면 본래 A/B 흐름으로 복귀.
+     * (차시 추가 모드 Flow B는 항상 ProjectPageFragment로 이동 — 플래그 무관)
+     */
+    private static final boolean DEMO_SKIP_PROJECT_LIST = false;
+
     private boolean isFanart;
 
     public SimulationBusinessFragment() {}
@@ -150,101 +164,166 @@ public class SimulationBusinessFragment extends Fragment {
     }
 
     private void onConfirm() {
-        // 백엔드 호출 시도 → 성공/실패 무관하게 SimulationFragment로 복귀
-        attemptRunSimulationAndCreateProject();
-        navigateBackToSimulation();
+        if (getContext() != null) {
+            Toast.makeText(getContext().getApplicationContext(),
+                    "시뮬레이션 저장 완료", Toast.LENGTH_SHORT).show();
+        }
+        // 백엔드 응답 후 navigate (project_id를 응답에서 받아야 ProjectPageFragment로 갈 수 있음)
+        attemptRunSimulationAndChainNavigate();
     }
 
     /**
-     * POST /simulations 호출 (예상 원가 계산 + 시뮬레이션 저장).
-     * 성공 시 POST /simulations/{id}/project 연쇄 호출하여 프로젝트 자동 생성.
-     * 모든 필수 데이터가 백엔드와 매핑되지 않은 상태라 placeholder 값 사용 — TODO 표시.
+     * POST /simulations → (필요 시) POST /simulations/{id}/project 연쇄 호출 후
+     * 응답으로 받은 project_id로 ProjectPageFragment 이동 (또는 ProjectFragment 목록).
+     *
+     * mock 모드 (vendor_product_id 또는 platform_plan_id 가 null)면 API 호출 skip하고
+     * 즉시 fallback navigate.
      */
-    private void attemptRunSimulationAndCreateProject() {
+    private void attemptRunSimulationAndChainNavigate() {
         if (getContext() == null) return;
 
-        // 사용자 선택 시점에 SimulationData에 commit된 실제 ID 사용
         String vendorProductId = SimulationData.vendorProductId;
         String platformPlanId = SimulationData.platformPlanId;
+        final String capturedTargetProjectId = SimulationData.targetProjectId;  // null = 새 프로젝트 모드
 
         if (vendorProductId == null || platformPlanId == null) {
-            // mock 모드 또는 직접입력 → API 호출 skip
-            Toast.makeText(getContext(), "시뮬레이션 저장 완료 (로컬)", Toast.LENGTH_SHORT).show();
+            android.util.Log.w("SimulationConfirm",
+                    "❌ MOCK 모드 진입 — 백엔드 호출 SKIP (mock fallback navigate)");
+            finishAndNavigate(capturedTargetProjectId);
             return;
         }
 
         int quantity = SimulationData.quantity != null ? SimulationData.quantity : 0;
-        int sellingPrice = 0; // 판매가는 프로젝트 페이지에서 입력받음 — 시뮬레이션 시점엔 0
+        int sellingPrice = 0;
         int shippingFeeBuyer = SimulationData.shippingFeeBuyer != null
                 ? SimulationData.shippingFeeBuyer : 0;
         String shippingType = SimulationData.shippingFeeType != null
                 ? SimulationData.shippingFeeType : "buyer";
-        // 옵션 ID들을 쉼표 join (백엔드는 "uuid1,uuid2" 포맷 기대)
         String selectedOptionIds = (SimulationData.selectedOptionIds != null
                 && !SimulationData.selectedOptionIds.isEmpty())
                 ? android.text.TextUtils.join(",", SimulationData.selectedOptionIds)
                 : "";
         Integer targetQty = SimulationData.targetQuantity;
 
+        android.util.Log.d("SimulationConfirm",
+                "→ POST /simulations 호출 시작 (targetProjectId=" + capturedTargetProjectId
+                + " " + (capturedTargetProjectId != null ? "[차시 추가]" : "[새 프로젝트]") + ")");
+
         RetrofitClient.getApi(requireContext()).runSimulation(
                 SimulationData.modelType != null ? SimulationData.modelType : "Business",
                 vendorProductId, quantity, platformPlanId,
                 sellingPrice, shippingFeeBuyer, shippingType,
-                selectedOptionIds, targetQty
+                selectedOptionIds, targetQty,
+                capturedTargetProjectId
         ).enqueue(new Callback<SimulationResultDto>() {
             @Override
             public void onResponse(@NonNull Call<SimulationResultDto> call,
                                    @NonNull Response<SimulationResultDto> resp) {
                 if (!isAdded()) return;
-                if (resp.isSuccessful() && resp.body() != null) {
-                    SimulationResultDto r = resp.body();
-                    SimulationData.estimatedCost = r.totalCost;
-                    if (r.simulationId != null) {
-                        // 연쇄: 프로젝트 생성
-                        createProjectFromSimulation(r.simulationId);
-                        // 연쇄: 결과 조회 (옵션)
-                        fetchSimulationDetail(r.simulationId);
-                    }
+                if (!resp.isSuccessful() || resp.body() == null || resp.body().simulationId == null) {
+                    android.util.Log.e("SimulationConfirm",
+                            "❌ POST /simulations 실패: HTTP " + resp.code() + " → fallback navigate");
+                    finishAndNavigate(capturedTargetProjectId);
+                    return;
+                }
+                SimulationResultDto r = resp.body();
+                SimulationData.estimatedCost = r.totalCost;
+                android.util.Log.d("SimulationConfirm",
+                        "✅ 시뮬레이션 OK: simulation_id=" + r.simulationId);
+
+                if (capturedTargetProjectId != null) {
+                    // Flow B: 기존 프로젝트에 차시 attach 완료 — 그 프로젝트로 이동
+                    finishAndNavigate(capturedTargetProjectId);
+                } else {
+                    // Flow A: 새 프로젝트 생성 후 그 프로젝트로 이동
+                    createProjectAndNavigate(r.simulationId);
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<SimulationResultDto> call, @NonNull Throwable t) {
-                // 실패: 로컬 데이터로만 동작
+                if (!isAdded()) return;
+                android.util.Log.e("SimulationConfirm",
+                        "← POST /simulations FAILED: " + t.getMessage() + " → fallback navigate");
+                finishAndNavigate(capturedTargetProjectId);
             }
         });
     }
 
-    /** POST /simulations/{id}/project — 프로젝트 자동 생성 */
-    private void createProjectFromSimulation(String simulationId) {
+    /** POST /simulations/{id}/project 호출 후 응답의 project_id로 navigate. */
+    private void createProjectAndNavigate(String simulationId) {
         if (getContext() == null) return;
         String name = buildProjectName();
+        android.util.Log.d("SimulationConfirm",
+                "→ POST /simulations/" + simulationId + "/project?name=\"" + name + "\"");
         RetrofitClient.getApi(requireContext())
                 .createProjectFromSimulation(simulationId, name)
                 .enqueue(new Callback<ProjectFromSimulationDto>() {
                     @Override
                     public void onResponse(@NonNull Call<ProjectFromSimulationDto> call,
                                            @NonNull Response<ProjectFromSimulationDto> resp) {
-                        // 응답 받음 — 프로젝트 ID 저장하거나 알림 정도. 화면은 이미 복귀 중.
+                        if (!isAdded()) return;
+                        String newProjectId = (resp.isSuccessful() && resp.body() != null)
+                                ? resp.body().projectId : null;
+                        android.util.Log.d("SimulationConfirm",
+                                "← POST .../project 응답: HTTP " + resp.code()
+                                + ", project_id=" + newProjectId);
+                        finishAndNavigate(newProjectId);
                     }
 
                     @Override
                     public void onFailure(@NonNull Call<ProjectFromSimulationDto> call,
                                           @NonNull Throwable t) {
-                        // 무시
+                        if (!isAdded()) return;
+                        android.util.Log.e("SimulationConfirm",
+                                "← POST .../project FAILED: " + t.getMessage());
+                        finishAndNavigate(null);
                     }
                 });
     }
 
     /**
-     * 사용자가 요약 페이지에서 선택한 핵심 값들을 프로젝트 이름에 인코딩.
+     * 시뮬레이션 흐름 종료 후 화면 이동.
+     * - DEMO_SKIP_PROJECT_LIST 가 true: projectId 있으면 ProjectPageFragment로 직접
+     * - DEMO_SKIP_PROJECT_LIST 가 false: 차시 추가 모드면 ProjectPageFragment, 새 프로젝트면 ProjectFragment 목록으로
+     */
+    private void finishAndNavigate(String projectId) {
+        boolean wasAddingChasi = SimulationData.targetProjectId != null;
+        SimulationData.reset();
+
+        if (!isAdded()) return;
+        try {
+            FragmentManager fm = getParentFragmentManager();
+            fm.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+            fm.executePendingTransactions();
+
+            androidx.fragment.app.Fragment dest;
+            if (DEMO_SKIP_PROJECT_LIST) {
+                // 시현 모드 — 항상 ProjectPageFragment로 (projectId 없으면 fallback)
+                dest = (projectId != null)
+                        ? ProjectPageFragment.newInstance(projectId)
+                        : new ProjectFragment();
+            } else {
+                // 정상 모드 — 차시 추가는 ProjectPageFragment, 새 프로젝트는 ProjectFragment 목록
+                dest = wasAddingChasi && projectId != null
+                        ? ProjectPageFragment.newInstance(projectId)
+                        : new ProjectFragment();
+            }
+
+            fm.beginTransaction()
+                    .replace(R.id.main_fragment, dest)
+                    .commitAllowingStateLoss();
+        } catch (IllegalStateException e) {
+            // state-already-saved 등 — 무시
+        }
+    }
+
+    /**
+     * SimulationData 값들로 프로젝트 이름 자동 생성.
      * 예: "스티커 100개 · 레드프린팅 · 텀블벅 (5%)"
-     * 백엔드 project 엔티티엔 quantity/vendor/platform 필드가 없어서, 이렇게 name으로 우회.
      */
     private String buildProjectName() {
         StringBuilder sb = new StringBuilder();
-
-        // 굿즈 유형 + 수량
         if (SimulationData.goodsType != null) {
             sb.append(SimulationData.goodsType);
         }
@@ -252,14 +331,10 @@ public class SimulationBusinessFragment extends Fragment {
             if (sb.length() > 0) sb.append(" ");
             sb.append(SimulationData.quantity).append("개");
         }
-
-        // 제작 업체
         if (SimulationData.vendorName != null) {
             if (sb.length() > 0) sb.append(" · ");
             sb.append(SimulationData.vendorName);
         }
-
-        // 판매 업체 + 수수료
         if (SimulationData.platformName != null) {
             if (sb.length() > 0) sb.append(" · ");
             sb.append(SimulationData.platformName);
@@ -267,43 +342,9 @@ public class SimulationBusinessFragment extends Fragment {
                 sb.append(" (").append(SimulationData.platformFee).append("%)");
             }
         }
-
-        // 아무것도 없으면 timestamp fallback
         if (sb.length() == 0) {
             sb.append("Simulation - ").append(System.currentTimeMillis());
         }
-
         return sb.toString();
-    }
-
-    /** GET /simulations/{id} — 저장된 시뮬레이션 결과 조회 (현재는 호출만, 데이터 활용 미구현) */
-    private void fetchSimulationDetail(String simulationId) {
-        if (getContext() == null) return;
-        RetrofitClient.getApi(requireContext())
-                .getSimulation(simulationId)
-                .enqueue(new Callback<SimulationDetailDto>() {
-                    @Override
-                    public void onResponse(@NonNull Call<SimulationDetailDto> call,
-                                           @NonNull Response<SimulationDetailDto> resp) {
-                        // 응답 OK. 향후 UI 갱신 시 사용 가능.
-                    }
-
-                    @Override
-                    public void onFailure(@NonNull Call<SimulationDetailDto> call, @NonNull Throwable t) {
-                        // 무시
-                    }
-                });
-    }
-
-    /** 시뮬레이션 흐름 종료 및 홈으로 복귀 */
-    private void navigateBackToSimulation() {
-        Toast.makeText(getContext(), "시뮬레이션 저장 완료", Toast.LENGTH_SHORT).show();
-        SimulationData.reset();
-
-        FragmentManager fm = getParentFragmentManager();
-        fm.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
-        fm.beginTransaction()
-                .replace(R.id.main_fragment, new SimulationFragment())
-                .commit();
     }
 }

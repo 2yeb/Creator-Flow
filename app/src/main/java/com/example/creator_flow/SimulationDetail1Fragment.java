@@ -65,6 +65,14 @@ public class SimulationDetail1Fragment extends Fragment {
     private static final List<VendorInfo> ALL_VENDORS;
 
     static {
+        // ===== Mock 데이터 주석 처리됨 — 백엔드 연결 확인용 (2026-06) =====
+        // API 호출이 실패해도 fallback 안 됨 → 빈 Spinner / 빈 카드로 표시되어
+        // "백엔드 진짜로 연결됐는지" 즉시 알 수 있음.
+        // 시현 시 백엔드 안 되면 모든 화면 비어보임 — 의도된 동작.
+        ALL_VENDORS = java.util.Collections.emptyList();
+    }
+    /*
+    static {
         // ============= 굿즈 유형 → 세부 유형 =============
         GOODS_TYPE_TO_SUBTYPES.put("스티커", Arrays.asList("띠부띠부 스티커", "완칼 스티커", "반칼 스티커", "조각 스티커"));
         GOODS_TYPE_TO_SUBTYPES.put("포스터", Arrays.asList("A4", "B4", "A3", "A2", "A1"));
@@ -307,6 +315,8 @@ public class SimulationDetail1Fragment extends Fragment {
                                 .build())
         );
     }
+    */
+    // ===== Mock 주석 끝 =====
 
     // ----- 옵션/케이프 빌더 헬퍼 -----
     private static OptsBuilder opts() { return new OptsBuilder(); }
