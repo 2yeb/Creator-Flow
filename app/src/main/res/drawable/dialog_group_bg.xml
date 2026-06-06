@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 프로젝트 변경 토글 선택 -->
-    <solid android:color="#8DC84A" />
+    <stroke
+        android:color="@color/outline"
+        android:width="1dp" />
     <corners android:radius="10dp" />
+    <solid android:color="#F6F6F6" />
 </shape>

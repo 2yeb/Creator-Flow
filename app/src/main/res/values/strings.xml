@@ -27,4 +27,14 @@
         <item>컵</item>
         <item>직접입력</item>
     </string-array>
+
+    <!-- 정가 계산기 수수료율 드롭다운 -->
+    <string-array name="calculator_service_fee">
+        <item>0%</item>
+        <item>5%</item>
+        <item>10%</item>
+        <item>15%</item>
+        <item>20%</item>
+        <item>직접 입력</item>
+    </string-array>
 </resources>

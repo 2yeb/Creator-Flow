@@ -1,5 +1,7 @@
 package com.example.creator_flow.network;
 
+import com.example.creator_flow.CreateGroupRequest;
+import com.example.creator_flow.GroupListResponse;
 import com.example.creator_flow.model.GoodsDetailTypeDto;
 import com.example.creator_flow.model.GoodsTypeDto;
 import com.example.creator_flow.model.ImageUploadResponse;
@@ -9,6 +11,14 @@ import com.example.creator_flow.model.ProductOptionDto;
 import com.example.creator_flow.model.ProjectFromSimulationDto;
 import com.example.creator_flow.model.ProjectImageDto;
 import com.example.creator_flow.model.ProjectResponse;
+import com.example.creator_flow.model.UpdateProjectRequest;
+// projectList
+import com.example.creator_flow.ProjectListResponse;
+// Group
+// to-do
+import com.example.creator_flow.TodoListResponse;
+import com.example.creator_flow.UpdateTodoRequest;
+import com.example.creator_flow.CreateTodoRequest;
 import com.example.creator_flow.model.SimulationDetailDto;
 import com.example.creator_flow.model.SimulationResultDto;
 import com.example.creator_flow.model.UpdateProjectRequest;
@@ -192,4 +202,58 @@ public interface ApiService {
     Call<ProjectFromSimulationDto> createProjectFromSimulation(
             @Path("simulation_id") String simulationId,
             @Query("name") String projectName);
+
+    // ── To-Do 리스트 ──────────────────────────────────────────────────────────
+
+    /** To-Do 전체 조회 */
+    @GET("todos")
+    Call<List<TodoListResponse>> getTodos();
+
+    /** 특정 프로젝트에 To-Do 생성 */
+    @POST("projects/{id}/todos")
+    Call<TodoListResponse> createTodo(
+            @Path("id") String projectId,
+            @Body CreateTodoRequest body
+    );
+
+    /** To-Do 수정 / 완료 처리 */
+    @PUT("todos/{id}")
+    Call<TodoListResponse> updateTodo(
+            @Path("id") String todoId,
+            @Body UpdateTodoRequest body
+    );
+
+    /** To-Do 삭제 */
+    @DELETE("todos/{id}")
+    Call<JsonObject> deleteTodo(@Path("id") String todoId);
+
+    // ── 그룹 ──────────────────────────────────────────────────────────
+
+    /** 그룹 전체 조회 */
+    @GET("groups")
+    Call<List<GroupListResponse>> getGroups();
+
+    /** 그룹 생성 */
+    @POST("groups")
+    Call<GroupListResponse> createGroup(@Body CreateGroupRequest body);
+
+    /** 그룹 삭제 */
+    @DELETE("groups/{id}")
+    Call<JsonObject> deleteGroup(@Path("id") String GroupId);
+
+    /** 프로젝트에 그룹 태그 */
+    //@POST("projects/{id}/groups")
+    /**Call<GroupTagResponse> attachGroupToProject(
+            @Path("id") String projectId,
+            @Body AttachGroupRequest body
+    );*/
+
+    // ── 프로젝트 상태 ──────────────────────────────────────────────────────────
+
+    /** 전체 프로젝트 목록 조회 */
+    @GET("projects")
+    Call<List<ProjectListResponse>> getProjects();
+
+    @POST("projects")
+    Call<ProjectListResponse> createProject(@Body ProjectListResponse project);
 }

@@ -5,41 +5,87 @@
     android:id="@+id/home_const"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#8DC84A"
+    android:background="@drawable/bg_factory"
     tools:context=".HomeFragment">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@drawable/background_back"
-        android:layout_marginTop="10dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        android:orientation="horizontal">
-
-    </LinearLayout>
-
     <TextView
-        android:id="@+id/carculator_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginLeft="25dp"
         android:layout_marginBottom="17dp"
         android:text="정가 계산기"
         android:textSize="22sp"
         android:textColor="#313131"
         android:textStyle="bold"
         app:layout_constraintBottom_toTopOf="@+id/carculator_background"
-        app:layout_constraintStart_toStartOf="parent">
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
     </TextView>
 
+    <!-- 영수증 -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/price_receipt"
+        android:layout_width="300dp"
+        android:layout_height="100dp"
+        android:layout_marginTop="665dp"
+        android:background="@drawable/home_ex"
+        android:visibility="invisible"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="27dp"
+            android:text="정가"
+            android:textColor="@color/text_color"
+            android:textSize="20sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="wrap_content"
+            android:layout_height="35dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="26dp"
+            app:cardBackgroundColor="#EDEDED"
+            app:cardCornerRadius="15dp"
+            app:cardElevation="0dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <TextView
+                android:id="@+id/pullPriceTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="15dp"
+                android:layout_marginEnd="35dp"
+                android:gravity="end"
+                android:textColor="@color/text_color"
+                android:textSize="20sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_marginTop="10dp"
+                android:layout_marginEnd="10dp"
+                android:text="/ 개"
+                android:textColor="@color/text_color"
+                android:textSize="12sp" />
+        </androidx.cardview.widget.CardView>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+    <!-- 계산기 본체 -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/carculator_background"
-        android:layout_width="340dp"
-        android:layout_height="459dp"
-        android:layout_marginTop="143dp"
+        android:layout_width="330dp"
+        android:layout_height="460dp"
+        android:layout_marginTop="215dp"
         android:background="@drawable/home_roundable"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -47,13 +93,357 @@
 
         <androidx.cardview.widget.CardView
             android:id="@+id/cal_insert"
-            android:layout_width="293dp"
-            android:layout_height="112dp"
+            android:layout_width="265dp"
+            android:layout_height="102dp"
             android:layout_marginTop="25dp"
             app:cardCornerRadius="22dp"
+            app:cardElevation="0dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"/>
+            app:layout_constraintTop_toTopOf="parent">
 
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <TextView
+                    android:id="@+id/input_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_marginTop="14dp"
+                    android:text="단가"
+                    android:textStyle="bold"
+                    android:textColor="@color/bottom_navigation"
+                    android:textSize="20sp"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+                <LinearLayout
+                    android:id="@+id/input_container_linear"
+                    android:layout_width="150dp"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="12dp"
+                    android:layout_marginBottom="17dp"
+                    android:background="@drawable/home_edittext"
+                    android:orientation="horizontal"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent">
+
+                    <EditText
+                        android:id="@+id/input_edit"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="9dp"
+                        android:background="@null"
+                        android:ems="10"
+                        android:gravity="end"
+                        android:layout_gravity="center_vertical"
+                        android:inputType="number"
+                        android:textColor="@color/text_color"
+                        android:textSize="20sp" />
+                </LinearLayout>
+
+                <Spinner
+                    android:id="@+id/fee_spinner"
+                    android:layout_width="150dp"
+                    android:layout_height="32dp"
+                    android:layout_marginEnd="12dp"
+                    android:layout_marginBottom="17dp"
+                    android:background="@drawable/home_edittext"
+                    android:entries="@array/calculator_service_fee"
+                    android:spinnerMode="dropdown"
+                    android:textAlignment="textEnd"
+                    android:visibility="invisible"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <TextView
+            android:id="@+id/reset_btn"
+            android:layout_width="65dp"
+            android:layout_height="35dp"
+            android:layout_marginStart="35dp"
+            android:layout_marginTop="19dp"
+            android:background="@drawable/reset_button"
+            android:gravity="center"
+            android:text="초기화"
+            android:textColor="@color/text_color"
+            android:textSize="16sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/cal_insert" />
+
+        <View
+            android:id="@+id/design_btn1"
+            android:layout_width="50dp"
+            android:layout_height="35dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="19dp"
+            android:background="@drawable/home_designbtn"
+            app:layout_constraintStart_toEndOf="@id/reset_btn"
+            app:layout_constraintTop_toBottomOf="@id/cal_insert" />
+
+        <View
+            android:id="@+id/design_btn2"
+            android:layout_width="50dp"
+            android:layout_height="35dp"
+            android:layout_marginStart="13dp"
+            android:layout_marginTop="19dp"
+            android:background="@drawable/home_designbtn"
+            app:layout_constraintStart_toEndOf="@id/design_btn1"
+            app:layout_constraintTop_toBottomOf="@id/cal_insert" />
+
+        <View
+            android:id="@+id/design_btn3"
+            android:layout_width="50dp"
+            android:layout_height="35dp"
+            android:layout_marginStart="13dp"
+            android:layout_marginTop="19dp"
+            android:background="@drawable/home_designbtn"
+            app:layout_constraintStart_toEndOf="@id/design_btn2"
+            app:layout_constraintTop_toBottomOf="@id/cal_insert" />
+
+        <ImageView
+            android:id="@+id/help_sub_material_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ic_question_mark"
+            android:layout_marginStart="6dp"
+            app:layout_constraintStart_toEndOf="@+id/textView10"
+            app:layout_constraintTop_toTopOf="@id/textView10"
+            app:layout_constraintBottom_toBottomOf="@id/textView10"/>
+
+        <ImageView
+            android:id="@+id/help_fee_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:src="@drawable/ic_question_mark"
+            app:layout_constraintBottom_toBottomOf="@id/textView11"
+            app:layout_constraintStart_toEndOf="@+id/textView11"
+            app:layout_constraintTop_toTopOf="@id/textView11" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="단가"
+            android:textSize="16sp"
+            android:textColor="@color/text_color"
+            android:gravity="center"
+            android:layout_marginTop="25dp"
+            android:layout_marginStart="48dp"
+            app:layout_constraintTop_toBottomOf="@id/design_btn3"
+            app:layout_constraintStart_toStartOf="parent"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="20dp"
+            android:text="수량"
+            android:textSize="16sp"
+            android:textColor="@color/text_color"
+            android:layout_marginTop="57dp"
+            android:layout_marginStart="48dp"
+            app:layout_constraintTop_toBottomOf="@id/design_btn3"
+            app:layout_constraintStart_toStartOf="parent"/>
+
+        <TextView
+            android:id="@+id/textView10"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="48dp"
+            android:layout_marginTop="89dp"
+            android:text="부자재비"
+            android:textColor="@color/text_color"
+            android:textSize="16sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/design_btn3" />
+
+        <TextView
+            android:id="@+id/textView11"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="48dp"
+            android:layout_marginTop="121dp"
+            android:text="수수료율"
+            android:textColor="@color/text_color"
+            android:textSize="16sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/design_btn3" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="목표순이익"
+            android:textSize="16sp"
+            android:textColor="@color/text_color"
+            android:layout_marginTop="153dp"
+            android:layout_marginStart="48dp"
+            app:layout_constraintTop_toBottomOf="@id/design_btn3"
+            app:layout_constraintStart_toStartOf="parent"/>
+
+        <LinearLayout
+            android:id="@+id/price_btn"
+            android:layout_width="125dp"
+            android:layout_height="22dp"
+            android:background="@drawable/home_text"
+            android:orientation="horizontal"
+            android:layout_marginHorizontal="8dp"
+            android:layout_marginTop="25dp"
+            android:layout_marginEnd="31dp"
+            app:layout_constraintTop_toBottomOf="@id/design_btn3"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <TextView
+                android:id="@+id/price_tv"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:gravity="end"
+                android:textColor="@color/text_color"
+                android:textSize="16sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/quantity_btn"
+            android:layout_width="125dp"
+            android:layout_height="22dp"
+            android:background="@drawable/home_text"
+            android:orientation="horizontal"
+            android:layout_marginHorizontal="8dp"
+            android:layout_marginTop="57dp"
+            android:layout_marginEnd="31dp"
+            app:layout_constraintTop_toBottomOf="@id/design_btn3"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <TextView
+                android:id="@+id/quantity_tv"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:layout_gravity="center_vertical"
+                android:layout_marginEnd="8dp"
+                android:textSize="16sp"
+                android:textColor="@color/text_color"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/sub_material_btn"
+            android:layout_width="125dp"
+            android:layout_height="22dp"
+            android:background="@drawable/home_text"
+            android:orientation="horizontal"
+            android:layout_marginTop="89dp"
+            android:layout_marginEnd="31dp"
+            app:layout_constraintTop_toBottomOf="@id/design_btn3"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <TextView
+                android:id="@+id/sub_material_tv"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:gravity="end"
+                android:textColor="@color/text_color"
+                android:textSize="16sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/fee_btn"
+            android:layout_width="125dp"
+            android:layout_height="22dp"
+            android:background="@drawable/home_text"
+            android:orientation="horizontal"
+            android:layout_marginHorizontal="8dp"
+            android:layout_marginTop="121dp"
+            android:layout_marginEnd="31dp"
+            app:layout_constraintTop_toBottomOf="@id/design_btn3"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <TextView
+                android:id="@+id/fee_tv"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:layout_marginEnd="8dp"
+                android:textSize="16sp"
+                android:textColor="@color/text_color"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/target_btn"
+            android:layout_width="125dp"
+            android:layout_height="22dp"
+            android:background="@drawable/home_text"
+            android:orientation="horizontal"
+            android:layout_marginHorizontal="8dp"
+            android:layout_marginTop="153dp"
+            android:layout_marginEnd="31dp"
+            app:layout_constraintTop_toBottomOf="@id/design_btn3"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <TextView
+                android:id="@+id/target_tv"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:layout_marginEnd="8dp"
+                android:textSize="16sp"
+                android:textColor="@color/text_color"/>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/calculate_btn"
+            android:layout_width="81dp"
+            android:layout_height="41dp"
+            android:gravity="center"
+            android:background="@drawable/home_calcuatebtn"
+            android:textColor="@color/text_color"
+            android:textSize="16sp"
+            android:text="계산"
+            android:layout_marginEnd="33dp"
+            android:layout_marginBottom="32dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"/>
+
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- 설명 -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/description_card"
+        android:layout_width="330dp"
+        android:layout_height="50dp"
+        android:background="@drawable/home_ex"
+        android:layout_marginTop="22dp"
+        app:layout_constraintTop_toBottomOf="@id/carculator_background"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:visibility="invisible">
+
+        <TextView
+            android:id="@+id/description_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="@color/text_color"
+            android:layout_marginTop="9dp"
+            android:layout_marginStart="15dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"/>
+
+        <TextView
+            android:id="@+id/description_body"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="10sp"
+            android:textColor="@color/text_color"
+            android:layout_marginTop="25dp"
+            android:layout_marginStart="15dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"/>
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>
