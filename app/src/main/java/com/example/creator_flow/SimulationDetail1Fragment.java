@@ -771,6 +771,60 @@ public class SimulationDetail1Fragment extends Fragment {
     }
 
     /**
+     * vendor의 단가 계산 — 선택된 옵션들의 extra_price 합산.
+     *
+     * 백엔드 vendor_product 자체엔 base_price 컬럼이 없고(VendorProductDto 참고),
+     * 옵션마다 extra_price가 책정돼있어 그 합이 단가가 됨.
+     * 옵션이 다 선택되지 않거나 vendor의 옵션 데이터가 아직 안 들어왔으면 0 반환.
+     *
+     * 주의: 시뮬레이션 실행 후의 백엔드 unit_cost와 다를 수 있음 (백엔드 계산식이
+     * 더 복잡할 가능성). 시현용 "대략 가격 비교" 용도.
+     */
+    private int calculateVendorUnitCost(String vendorName) {
+        List<ProductOptionDto> opts = vendorNameToOptions.get(vendorName);
+        if (opts == null || opts.isEmpty()) return 0;
+        int sum = 0;
+        for (Map.Entry<String, String> sel : selectedOptions.entrySet()) {
+            for (ProductOptionDto opt : opts) {
+                if (sel.getKey().equals(opt.optionName)
+                        && sel.getValue().equals(opt.optionValue)) {
+                    if (opt.extraPrice != null) sum += opt.extraPrice;
+                    break;
+                }
+            }
+        }
+        return sum;
+    }
+
+    /**
+     * 가격에 영향 주는 변경(옵션 / 수량)이 발생하면 호출 — vendor 카드 다시 그리기.
+     * - API 모드: rebuildAndRenderApiVendors()로 단가 재계산까지
+     * - mock 모드: renderVendorCards()만 (mock VendorInfo는 basePrice 캐시 그대로)
+     */
+    private void rerenderVendorCardsForPriceChange() {
+        View root = getView();
+        if (root == null) return;
+        if (!apiVendors.isEmpty()) {
+            rebuildAndRenderApiVendors();
+        } else {
+            renderVendorCards(root);
+        }
+    }
+
+    /** 현재 수량 — EditText 값이 신뢰 가능한 출처 (SimulationData.quantity는 "다음" 누른 후에만 갱신됨) */
+    private int getCurrentQuantity() {
+        View root = getView();
+        if (root == null) return 0;
+        android.widget.EditText etValue = root.findViewById(R.id.tv_quantity_value);
+        if (etValue == null) return 0;
+        try {
+            return Integer.parseInt(etValue.getText().toString().trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
      * vendorNameToId + vendorNameToProduct + vendorNameToOptions 로부터 apiVendors를 재빌드하고
      * 업체 카드 다시 렌더.
      */
@@ -798,11 +852,17 @@ public class SimulationDetail1Fragment extends Fragment {
             int shippingFee = vp.shippingFee != null ? vp.shippingFee : 0;
             boolean freeShipping = vp.freeShippingMin == null && shippingFee == 0;
 
-            VendorInfo info = new VendorInfo(
+            // 단가 = 선택된 옵션들의 extra_price 합산.
+             // 카드에는 총가격(단가 × 수량) 표시 — 사용자의 vendor 비교 직관에 맞춤.
+             // 옵션이 다 안 들어왔을 때는 0 (자동 fallback).
+             int unitCost = calculateVendorUnitCost(name);
+             int totalCost = unitCost * getCurrentQuantity();
+
+             VendorInfo info = new VendorInfo(
                     name,
                     pickBrandColor(name),
                     CARD_BG_COLOR,
-                    0,                         // basePrice: POST /simulations 이전엔 모름
+                    totalCost,                 // basePrice 자리: 단가 × 수량
                     shippingFee,
                     freeShipping,
                     capabilities
@@ -856,7 +916,8 @@ public class SimulationDetail1Fragment extends Fragment {
                 chip.setOnClickListener(v -> {
                     selectedOptions.put(category, value);
                     renderOptionChips(root);
-                    renderVendorCards(root);
+                    // API 모드면 단가 재계산까지 (extra_price 합산이 바뀜)
+                    rerenderVendorCardsForPriceChange();
                 });
                 row.addView(chip);
             }
@@ -1037,6 +1098,8 @@ public class SimulationDetail1Fragment extends Fragment {
                     }
                 }
                 lastProgress[0] = progress;
+                // 수량 바뀌면 vendor 카드 총가격 갱신 (단가 × 수량) — API 모드도 함께 처리
+                rerenderVendorCardsForPriceChange();
             }
             @Override public void onStartTrackingTouch(SeekBar sb) {}
             @Override public void onStopTrackingTouch(SeekBar sb) {}
@@ -1057,6 +1120,8 @@ public class SimulationDetail1Fragment extends Fragment {
                     seekBar.setProgress(seekValue);
                     syncing[0] = false;
                     lastProgress[0] = seekValue;
+                    // 수량 바뀌면 vendor 카드 총가격 갱신 — API 모드도 함께 처리
+                    rerenderVendorCardsForPriceChange();
                 } catch (NumberFormatException ignored) {}
             }
         });
