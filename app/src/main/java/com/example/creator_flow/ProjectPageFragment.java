@@ -1,7 +1,6 @@
 package com.example.creator_flow;
 
 import android.app.AlertDialog;
-import android.app.DatePickerDialog;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -50,7 +49,14 @@ import androidx.fragment.app.Fragment;
 
 import com.example.creator_flow.model.ImageUploadResponse;
 import com.example.creator_flow.model.ProjectFile;
+import com.example.creator_flow.model.ProjectImageDto;
 import com.example.creator_flow.model.ProjectResponse;
+import com.example.creator_flow.model.SimulationDetailDto;
+import com.example.creator_flow.model.UpdateProjectRequest;
+import android.os.Handler;
+import android.os.Looper;
+import java.util.HashMap;
+import java.util.Map;
 import com.example.creator_flow.network.RetrofitClient;
 
 import java.io.InputStream;
@@ -146,6 +152,13 @@ public class ProjectPageFragment extends Fragment {
     private TextView tvSalesPercent;       // 달성 퍼센트 텍스트
     private android.widget.Button btnDeleteFile;  // 파일 삭제 버튼 (DELETE /projects/{id})
 
+    // ── 차시 자동 저장 (debounce) ────────────────────────────────────────────
+    /** EditText 입력 후 0.5초 동안 추가 입력 없으면 PUT /simulations 호출. */
+    private static final long SIM_SAVE_DEBOUNCE_MS = 500;
+    private final Handler debounceHandler = new Handler(Looper.getMainLooper());
+    /** chasiIndex → pending Runnable (같은 차시 빠른 입력 시 이전 작업 cancel) */
+    private final Map<Integer, Runnable> pendingSimSaves = new HashMap<>();
+
     public ProjectPageFragment() {}
 
     /**
@@ -239,6 +252,10 @@ public class ProjectPageFragment extends Fragment {
         tvSalesPercent        = view.findViewById(R.id.tv_sales_percent);
         btnDeleteFile         = view.findViewById(R.id.btn_delete_file);
 
+        // 뒤로가기 (시뮬레이션 페이지들과 동일 패턴)
+        view.findViewById(R.id.btn_back).setOnClickListener(v ->
+                requireActivity().getOnBackPressedDispatcher().onBackPressed());
+
         // Bundle에서 프로젝트 ID 읽기
         if (getArguments() != null) {
             projectId = getArguments().getString("project_id");
@@ -289,6 +306,10 @@ public class ProjectPageFragment extends Fragment {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerCategory.setAdapter(adapter);
 
+        // 드롭다운 폭을 spinner 자체 폭과 동일하게 (post: spinner가 실제 measure된 후 적용)
+        spinnerCategory.post(() ->
+                spinnerCategory.setDropDownWidth(spinnerCategory.getWidth()));
+
         spinnerCategory.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View v, int pos, long id) {
@@ -323,22 +344,30 @@ public class ProjectPageFragment extends Fragment {
             }
         });
 
-        // 날짜 클릭 → DatePickerDialog
+        // 날짜 클릭 → MaterialDatePicker (모던 캘린더 다이얼로그, 라임 테마)
         calender.setOnClickListener(v -> {
-            Calendar cal = Calendar.getInstance();
-            SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy", Locale.ENGLISH);
-            new DatePickerDialog(requireContext(),
-                    (dp, year, month, day) -> {
-                        Calendar sel = Calendar.getInstance();
-                        sel.set(year, month, day);
-                        String dateStr = sdf.format(sel.getTime());
-                        calender.setText(dateStr);
-                        fileList.get(selectedIndex).setDate(dateStr);
-                    },
-                    cal.get(Calendar.YEAR),
-                    cal.get(Calendar.MONTH),
-                    cal.get(Calendar.DAY_OF_MONTH)
-            ).show();
+            com.google.android.material.datepicker.MaterialDatePicker.Builder<Long> builder =
+                    com.google.android.material.datepicker.MaterialDatePicker.Builder.datePicker()
+                            .setTitleText("")   // 좌상단 "날짜 선택" 타이틀 비우기
+                            .setSelection(
+                                    com.google.android.material.datepicker.MaterialDatePicker.todayInUtcMilliseconds())
+                            .setInputMode(
+                                    com.google.android.material.datepicker.MaterialDatePicker.INPUT_MODE_CALENDAR)
+                            .setTheme(R.style.LimeMaterialCalendar);
+
+            com.google.android.material.datepicker.MaterialDatePicker<Long> picker = builder.build();
+
+            picker.addOnPositiveButtonClickListener(selection -> {
+                // selection: UTC milliseconds
+                Calendar sel = Calendar.getInstance();
+                sel.setTimeInMillis(selection);
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy.MM.dd", Locale.KOREAN);
+                String dateStr = sdf.format(sel.getTime());
+                calender.setText(dateStr);
+                fileList.get(selectedIndex).setDate(dateStr);
+            });
+
+            picker.show(getParentFragmentManager(), "date_picker");
         });
 
         // 판매가 입력 감지 → 수익 구조 파이차트 갱신
@@ -368,7 +397,74 @@ public class ProjectPageFragment extends Fragment {
             }
         });
 
-        // 현재/목표 판매량 입력 감지 → 프로그레스바 갱신
+        // 수량 입력 감지 → 현재 차시에 저장 + 백엔드 PUT (debounce)
+        etQuantity.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (isSwitching) return;
+                try {
+                    String t = s.toString();
+                    fileList.get(selectedIndex).setQuantity(t.isEmpty() ? 0 : Integer.parseInt(t));
+                    scheduleSaveSimulation(selectedIndex);
+                } catch (NumberFormatException ignored) {}
+            }
+        });
+
+        // 판매가 입력 감지 → 현재 차시에 저장 + 백엔드 PUT (debounce)
+        // (+ 위 profitChartWatcher가 파이차트도 갱신)
+        etRetailPrice.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (isSwitching) return;
+                try {
+                    String t = s.toString();
+                    fileList.get(selectedIndex).setSellingPrice(t.isEmpty() ? 0 : Integer.parseInt(t));
+                    scheduleSaveSimulation(selectedIndex);
+                } catch (NumberFormatException ignored) {}
+            }
+        });
+
+        // 제작 업체 입력 감지 → 현재 차시에 저장
+        etManufacturer.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (isSwitching) return;
+                fileList.get(selectedIndex).setVendorName(s.toString());
+            }
+        });
+
+        // 판매 업체 입력 감지 → 현재 차시에 저장
+        etSeller.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (isSwitching) return;
+                fileList.get(selectedIndex).setPlatformName(s.toString());
+            }
+        });
+
+        // 판매 수수료 입력 감지 → 현재 차시에 저장 (+ 위 profitChartWatcher가 차트도 갱신함)
+        etCommission.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (isSwitching) return;
+                try {
+                    String t = s.toString();
+                    fileList.get(selectedIndex).setFeeRate(t.isEmpty() ? 0 : Double.parseDouble(t));
+                } catch (NumberFormatException ignored) {}
+            }
+        });
+
+        // 현재/목표 판매량 입력 감지 → 프로그레스바 갱신 + 백엔드 PUT (debounce)
         TextWatcher salesWatcher = new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
@@ -386,6 +482,7 @@ public class ProjectPageFragment extends Fragment {
                             targetStr.isEmpty() ? 0 : Integer.parseInt(targetStr));
                 } catch (NumberFormatException ignored) {}
                 updateSalesProgress();
+                scheduleSaveSimulation(selectedIndex);
             }
         };
         etSoldQuantity.addTextChangedListener(salesWatcher);
@@ -518,9 +615,22 @@ public class ProjectPageFragment extends Fragment {
         if (folderImage.getDrawable() != null && folderImage.getTag() instanceof Uri) {
             fileList.get(selectedIndex).setThumbnailUri((Uri) folderImage.getTag());
         }
+        // 현재 차시의 사진 리스트 저장 (불변 복사로 다음 차시 작업 시 간섭 방지)
+        if (selectedIndex >= 0 && selectedIndex < fileList.size()) {
+            ProjectFile prev = fileList.get(selectedIndex);
+            prev.setPhotoUris(new ArrayList<>(photoList));
+            prev.setPhotoImageIds(new ArrayList<>(photoImageIds));
+        }
 
         selectedIndex = index;
         ProjectFile file = fileList.get(index);
+
+        // 새 차시의 사진 리스트 로드
+        photoList.clear();
+        photoImageIds.clear();
+        photoList.addAll(file.getPhotoUris());
+        photoImageIds.addAll(file.getPhotoImageIds());
+        refreshPhotoBox();
 
         // 썸네일 복원
         Uri thumbUri = file.getThumbnailUri();
@@ -559,8 +669,9 @@ public class ProjectPageFragment extends Fragment {
                 ContextCompat.getColor(requireContext(), colorRes[1])));
 
         isSwitching = false;
-        updateSalesProgress(); // 프로그레스바 갱신
-        refreshTabs(); // 탭 UI 갱신
+        updateSalesProgress(); // 프로그레스바 갱신 (per-차시)
+        updateProfitChart();   // 수익 구조 파이차트 갱신 (per-차시)
+        refreshTabs();         // 탭 UI 갱신
     }
 
     // ── 탭 UI ─────────────────────────────────────────────────────────────────
@@ -604,13 +715,33 @@ public class ProjectPageFragment extends Fragment {
     // ── 차시 추가 ─────────────────────────────────────────────────────────────
 
     /**
-     * 새 차시를 추가하고 해당 차시로 전환한다.
-     * 차시 번호는 현재 목록 크기 + 1로 자동 부여된다.
+     * 새 차시 추가 — 시뮬레이션 흐름으로 이동.
+     *
+     * 백엔드 POST /simulations는 vendor_product_id, platform_plan_id 등 외래키가 필수라
+     * 사용자가 수동으로 차시 데이터를 입력할 수 없음 → 시뮬레이션 화면 통과 후 자동 생성.
+     *
+     * - projectId 있을 때 (서버 연동 OK): SimulationData.targetProjectId 설정 후 SimulationFragment로 이동.
+     *   시뮬레이션 완료 시 POST /simulations에 project_id=현재 프로젝트 ID 전달되어 차시로 attach됨.
+     * - projectId 없을 때 (로컬 전용): 기존 로직대로 빈 차시 추가.
      */
     private void addChasi() {
-        fileList.add(new ProjectFile(fileList.size() + 1, null, null, today()));
-        switchChasi(fileList.size() - 1);
-        updateChart();
+        if (projectId == null) {
+            // 백엔드 연결 안 됨 → 로컬 빈 차시 추가 (구 동작)
+            fileList.add(new com.example.creator_flow.model.ProjectFile(
+                    fileList.size() + 1, null, null, today()));
+            switchChasi(fileList.size() - 1);
+            updateChart();
+            return;
+        }
+
+        // 백엔드 연결됨: 시뮬레이션 흐름 시작
+        com.example.creator_flow.model.SimulationData.reset();
+        com.example.creator_flow.model.SimulationData.targetProjectId = projectId;
+
+        getParentFragmentManager().beginTransaction()
+                .replace(R.id.main_fragment, new SimulationFragment())
+                .addToBackStack(null)
+                .commit();
     }
 
     // ── 서버 API ──────────────────────────────────────────────────────────────
@@ -649,11 +780,16 @@ public class ProjectPageFragment extends Fragment {
                                         s.createdAt != null ? formatDate(s.createdAt) : today()
                                 );
                                 file.setServerId(s.id);  // simulation id 보관
-                                // 응답에 직접 있는 필드들 우선 채움
+                                // 2026-06 백엔드 업데이트로 응답에 모든 필드 포함됨
+                                // (별도 GET /simulations 호출 불필요)
                                 if (s.quantity != null) file.setQuantity(s.quantity);
                                 if (s.sellingPrice != null) file.setSellingPrice(s.sellingPrice);
                                 if (s.targetQuantity != null) file.setTargetQuantity(s.targetQuantity);
                                 if (s.actualQuantity != null) file.setSoldQuantity(s.actualQuantity);
+                                if (s.unitCost != null) file.setPrice(s.unitCost);
+                                if (s.vendorName != null) file.setVendorName(s.vendorName);
+                                if (s.platformPlan != null) file.setPlatformName(s.platformPlan);
+                                if (s.feeRate != null) file.setFeeRate(s.feeRate);
                                 fileList.add(file);
                             }
                         }
@@ -670,22 +806,10 @@ public class ProjectPageFragment extends Fragment {
                             }
                         }
 
-                        // 각 차시의 상세 데이터(vendor_name, unit_cost 등) fetch
-                        for (int i = 0; i < fileList.size(); i++) {
-                            String simId = fileList.get(i).getServerId();
-                            if (simId != null) loadSimulationDetailForChasi(i, simId);
-                        }
-
-                        // 서버 이미지 — 백엔드 응답에 없을 수도 있으니 안전 처리
-                        if (project.images != null) {
-                            photoList.clear();
-                            photoImageIds.clear();
-                            for (ProjectResponse.ProjectImage img : project.images) {
-                                photoList.add(Uri.parse(img.imageUrl));
-                                photoImageIds.add(img.imageId);
-                            }
-                            refreshPhotoBox();
-                        }
+                        // 차시별 이미지 로드 — 2026-06-06 백엔드 추가 엔드포인트.
+                        // simulations[] 처리가 끝나서 각 ProjectFile.serverId가 설정된 상태이므로
+                        // simulation_id 기준으로 정확히 차시 매칭 가능.
+                        loadProjectImages();
                     }
 
                     @Override
@@ -694,6 +818,90 @@ public class ProjectPageFragment extends Fragment {
                             Toast.makeText(requireContext(), "프로젝트 로드 실패", Toast.LENGTH_SHORT).show();
                     }
                 });
+    }
+
+    /**
+     * GET /projects/{id}/images — 프로젝트의 모든 이미지를 받아 차시별로 분배.
+     *
+     * 2026-06-06 백엔드 업데이트로 추가된 엔드포인트. 응답에 simulation_id가 포함되어
+     * 어느 차시에 속한 이미지인지 알 수 있음 → 앱 재시작 후에도 차시별 사진이
+     * 정확히 그 차시로 복원됨.
+     *
+     * 호출 시점: loadProjectFromServer() 안에서 simulations[] 처리 직후
+     * (= 각 ProjectFile.serverId가 설정된 상태여야 매칭 가능).
+     */
+    private void loadProjectImages() {
+        if (projectId == null) return;
+        RetrofitClient.getApi(requireContext())
+                .getProjectImages(projectId, null)  // 전체 이미지 받아오기 (simulation_id 필터 X)
+                .enqueue(new Callback<List<ProjectImageDto>>() {
+                    @Override
+                    public void onResponse(Call<List<ProjectImageDto>> call,
+                                           Response<List<ProjectImageDto>> resp) {
+                        if (!isAdded() || resp.body() == null) return;
+                        distributeImagesToChasi(resp.body());
+                    }
+
+                    @Override
+                    public void onFailure(Call<List<ProjectImageDto>> call, Throwable t) {
+                        // 무시 — 이미지 복원만 안 되고 나머지 데이터는 정상 표시됨
+                        android.util.Log.w("ProjectPage",
+                                "이미지 목록 로드 실패: " + t.getMessage());
+                    }
+                });
+    }
+
+    /**
+     * 받아온 이미지를 simulation_id 기준으로 각 차시의 ProjectFile에 분배.
+     *
+     * - simulation_id가 차시의 serverId와 일치하면 그 차시에 attach.
+     * - simulation_id == null (어느 차시에도 안 묶인 옛날 이미지)이면 1차시에 fallback.
+     * - 매칭되는 차시를 못 찾으면 무시 (해당 차시가 삭제된 경우 등).
+     *
+     * 분배 후 현재 보고 있는 차시(selectedIndex) UI도 즉시 갱신.
+     */
+    private void distributeImagesToChasi(List<ProjectImageDto> images) {
+        // 각 차시의 사진 리스트 초기화 (loadProject로 새로 받은 상태이므로 비어있어야 함)
+        for (ProjectFile f : fileList) {
+            f.setPhotoUris(new ArrayList<>());
+            f.setPhotoImageIds(new ArrayList<>());
+        }
+
+        // simulation_id → 차시 인덱스 매칭
+        for (ProjectImageDto img : images) {
+            if (img == null || img.imageUrl == null) continue;
+
+            int targetIdx = -1;
+            if (img.simulationId != null) {
+                // serverId가 같은 차시 찾기
+                for (int i = 0; i < fileList.size(); i++) {
+                    if (img.simulationId.equals(fileList.get(i).getServerId())) {
+                        targetIdx = i;
+                        break;
+                    }
+                }
+            }
+            // simulation_id null 또는 매칭 실패 → 1차시(첫 번째 차시)로 fallback
+            if (targetIdx < 0 && !fileList.isEmpty()) targetIdx = 0;
+            if (targetIdx < 0) continue;
+
+            ProjectFile target = fileList.get(targetIdx);
+            // 차시당 최대 2개까지만 (refreshPhotoBox의 UI 제약과 일치)
+            if (target.getPhotoUris().size() >= 2) continue;
+
+            target.getPhotoUris().add(Uri.parse(img.imageUrl));
+            target.getPhotoImageIds().add(img.id);
+        }
+
+        // 현재 보고 있는 차시의 UI(photoList) 갱신
+        if (selectedIndex >= 0 && selectedIndex < fileList.size()) {
+            ProjectFile current = fileList.get(selectedIndex);
+            photoList.clear();
+            photoImageIds.clear();
+            photoList.addAll(current.getPhotoUris());
+            photoImageIds.addAll(current.getPhotoImageIds());
+            refreshPhotoBox();
+        }
     }
 
     /**
@@ -741,7 +949,7 @@ public class ProjectPageFragment extends Fragment {
             java.text.SimpleDateFormat inFmt =
                     new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
             java.util.Date d = inFmt.parse(iso.length() > 19 ? iso.substring(0, 19) : iso);
-            return new java.text.SimpleDateFormat("MMM d, yyyy", Locale.US).format(d);
+            return new java.text.SimpleDateFormat("yyyy.MM.dd", Locale.KOREAN).format(d);
         } catch (Exception e) {
             return iso;
         }
@@ -752,15 +960,62 @@ public class ProjectPageFragment extends Fragment {
      * 프로젝트명 TextWatcher에서 debounce 없이 호출되므로,
      * 입력이 끝날 때마다 저장된다 (추후 debounce 적용 권장).
      */
+    /**
+     * 차시(simulation) 자동 저장 스케줄링 — debounce 500ms.
+     * 같은 차시에 빠르게 여러 입력이 들어오면 마지막 입력 후 0.5초 뒤에 1번만 PUT.
+     */
+    private void scheduleSaveSimulation(int chasiIndex) {
+        Runnable prev = pendingSimSaves.get(chasiIndex);
+        if (prev != null) debounceHandler.removeCallbacks(prev);
+        Runnable task = () -> saveSimulationToServer(chasiIndex);
+        pendingSimSaves.put(chasiIndex, task);
+        debounceHandler.postDelayed(task, SIM_SAVE_DEBOUNCE_MS);
+    }
+
+    /**
+     * PUT /simulations/{id} — 차시의 quantity / selling_price / actual_quantity /
+     * target_quantity 를 백엔드에 반영.
+     * server_id가 null인 차시(시뮬레이션 안 거치고 수동 추가된 차시)는 skip.
+     */
+    private void saveSimulationToServer(int chasiIndex) {
+        if (!isAdded()) return;
+        if (chasiIndex < 0 || chasiIndex >= fileList.size()) return;
+        ProjectFile file = fileList.get(chasiIndex);
+        String simId = file.getServerId();
+        if (simId == null) return;  // 백엔드에 없는 차시 — 저장 불가
+
+        Integer quantity = file.getQuantity() > 0 ? file.getQuantity() : null;
+        Integer sellingPrice = file.getSellingPrice() > 0 ? file.getSellingPrice() : null;
+        Integer actualQty = file.getSoldQuantity() > 0 ? file.getSoldQuantity() : null;
+        Integer targetQty = file.getTargetQuantity() > 0 ? file.getTargetQuantity() : null;
+
+        RetrofitClient.getApi(requireContext())
+                .updateSimulation(simId, quantity, sellingPrice, actualQty, targetQty)
+                .enqueue(new Callback<SimulationDetailDto>() {
+                    @Override
+                    public void onResponse(Call<SimulationDetailDto> call,
+                                           Response<SimulationDetailDto> resp) {
+                        android.util.Log.d("SimSave",
+                                "차시 " + (chasiIndex+1) + " 저장: HTTP " + resp.code());
+                    }
+                    @Override
+                    public void onFailure(Call<SimulationDetailDto> call, Throwable t) {
+                        android.util.Log.e("SimSave",
+                                "차시 " + (chasiIndex+1) + " 저장 실패: " + t.getMessage());
+                    }
+                });
+    }
+
     private void saveProjectToServer() {
         if (projectId == null) return;
         ProjectFile current = fileList.get(selectedIndex);
-        // 백엔드 PUT /projects/{id}는 name + status 모두 query param으로 요구.
-        // 하나라도 null이면 백엔드가 422 반환하므로 빈 문자열로 대체.
+        // 2026-06 백엔드 업데이트로 다시 JSON body 받음 (Pydantic UpdateProjectRequest).
+        // name + status 모두 필수. null이면 빈 문자열로 대체.
         String name = current.getProjectName() != null ? current.getProjectName() : "";
         String status = current.getCategory() != null ? current.getCategory() : "";
+        UpdateProjectRequest body = new UpdateProjectRequest(name, status);
         RetrofitClient.getApi(requireContext())
-                .updateProject(projectId, name, status)
+                .updateProject(projectId, body)
                 .enqueue(new Callback<ProjectResponse>() {
                     @Override
                     public void onResponse(Call<ProjectResponse> call, Response<ProjectResponse> response) { }
@@ -794,8 +1049,13 @@ public class ProjectPageFragment extends Fragment {
             RequestBody reqBody = RequestBody.create(MediaType.parse("image/*"), tempFile);
             MultipartBody.Part part = MultipartBody.Part.createFormData("image", tempFile.getName(), reqBody);
 
+            // 현재 보고 있는 차시의 simulation_id 같이 보냄 → 차시별 분리 저장
+            // 시뮬레이션 거치지 않고 만든 차시는 serverId가 null → 백엔드에선 차시 미연결로 저장
+            String currentSimId = (selectedIndex >= 0 && selectedIndex < fileList.size())
+                    ? fileList.get(selectedIndex).getServerId() : null;
+
             RetrofitClient.getApi(requireContext())
-                    .uploadImage(projectId, part)
+                    .uploadImage(projectId, part, currentSimId)
                     .enqueue(new Callback<ImageUploadResponse>() {
                         @Override
                         public void onResponse(Call<ImageUploadResponse> call, Response<ImageUploadResponse> response) {
@@ -894,10 +1154,54 @@ public class ProjectPageFragment extends Fragment {
             return;
         }
 
-        // 최고값 계산
+        // 최소값/최대값 계산 — Y축 범위 동적 조정용
+        float minVal = Float.MAX_VALUE;
         float maxVal = Float.MIN_VALUE;
-        for (Entry e : entries) if (e.getY() > maxVal) maxVal = e.getY();
+        for (Entry e : entries) {
+            if (e.getY() < minVal) minVal = e.getY();
+            if (e.getY() > maxVal) maxVal = e.getY();
+        }
         final float maxValue = maxVal;
+
+        // Y축 범위 동적 설정 — nice step (1, 2, 2.5, 5 의 10의 거듭제곱 배수)
+        // → 라벨이 250, 500, 1000, 2500, 5000 같이 십단위가 0 또는 5로 떨어짐
+        YAxis leftAxis = chartUnitPrice.getAxisLeft();
+        float dataMin = minVal;
+        float dataMax = maxVal;
+        if (dataMax == dataMin) {
+            // 단일 값 → 양옆으로 25% 가상 range
+            float half = Math.max(dataMax * 0.25f, 100f);
+            dataMin -= half;
+            dataMax += half;
+        } else {
+            // 여러 값 → 데이터 위아래로 25% 여백 추가 (데이터가 가장자리에 붙지 않게)
+            float pad = (dataMax - dataMin) * 0.25f;
+            dataMin -= pad;
+            dataMax += pad;
+        }
+
+        // 약 4개 라벨 기준 step 후보 계산
+        float roughStep = (dataMax - dataMin) / 4f;
+        float magnitude = (float) Math.pow(10, Math.floor(Math.log10(roughStep)));
+        float fraction = roughStep / magnitude;
+        float niceFraction;
+        if (fraction <= 1f)        niceFraction = 1f;
+        else if (fraction <= 2f)   niceFraction = 2f;
+        else if (fraction <= 2.5f) niceFraction = 2.5f;
+        else if (fraction <= 5f)   niceFraction = 5f;
+        else                       niceFraction = 10f;
+        float step = niceFraction * magnitude;
+
+        // min을 step 배수로 내림, max를 step 배수로 올림
+        float niceMin = (float) Math.floor(dataMin / step) * step;
+        float niceMax = (float) Math.ceil(dataMax / step) * step;
+        niceMin = Math.max(0f, niceMin);
+
+        leftAxis.setAxisMinimum(niceMin);
+        leftAxis.setAxisMaximum(niceMax);
+        leftAxis.setGranularity(step);
+        int labelCount = (int) Math.round((niceMax - niceMin) / step) + 1;
+        leftAxis.setLabelCount(labelCount, true);
 
         LineDataSet dataSet = new LineDataSet(entries, "단가");
         dataSet.setColor(0xFF7EB4E8);
@@ -946,9 +1250,9 @@ public class ProjectPageFragment extends Fragment {
 
         List<PieEntry> entries = new ArrayList<>();
         List<Integer> colors = new ArrayList<>();
-        if (unitCost > 0) { entries.add(new PieEntry(unitCost, "제작 원가")); colors.add(0xFFFF8587); }
-        if (fee > 0)      { entries.add(new PieEntry(fee,      "판매 수수료")); colors.add(0xFFFFC171); }
-        if (profit > 0)   { entries.add(new PieEntry(profit,   "순이익"));    colors.add(0xFF97E1AC); }
+        if (unitCost > 0) { entries.add(new PieEntry(unitCost, "단가"));     colors.add(0xFFB0DBFF); }
+        if (fee > 0)      { entries.add(new PieEntry(fee,      "판매 수수료")); colors.add(0xFF73C0FF); }
+        if (profit > 0)   { entries.add(new PieEntry(profit,   "순이익"));    colors.add(0xFF44ABFF); }
 
         if (entries.isEmpty()) {
             chartProfitStructure.setVisibility(View.GONE);
@@ -1030,7 +1334,7 @@ public class ProjectPageFragment extends Fragment {
 
     /** 오늘 날짜를 "MMM d, yyyy" 형식(영문)으로 반환한다. 예: "May 10, 2026" */
     private String today() {
-        return new SimpleDateFormat("MMM d, yyyy", Locale.ENGLISH)
+        return new SimpleDateFormat("yyyy.MM.dd", Locale.KOREAN)
                 .format(Calendar.getInstance().getTime());
     }
 

@@ -2,6 +2,9 @@ package com.example.creator_flow.model;
 
 import android.net.Uri;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ProjectFile {
 
     private String projectName; // 프로젝트명
@@ -18,6 +21,10 @@ public class ProjectFile {
     private int targetQuantity; // 목표 판매량
     private String serverId;    // 서버에서 받은 simulation id (차시별 API 연동용)
     private Uri thumbnailUri;   // 차시별 썸네일 이미지 URI
+    /** 차시별 사진 URI 리스트 (로컬). 백엔드는 project 단위라 현재는 동기화 안 됨. */
+    private List<Uri> photoUris = new ArrayList<>();
+    /** 차시별 서버 image_id 리스트 (photoUris와 인덱스 동기화) */
+    private List<String> photoImageIds = new ArrayList<>();
 
     public ProjectFile(int chasiNumber, String projectName, String category, String date) {
         this.chasiNumber = chasiNumber;
@@ -67,4 +74,14 @@ public class ProjectFile {
 
     public Uri getThumbnailUri() { return thumbnailUri; }
     public void setThumbnailUri(Uri thumbnailUri) { this.thumbnailUri = thumbnailUri; }
+
+    public List<Uri> getPhotoUris() { return photoUris; }
+    public void setPhotoUris(List<Uri> photoUris) {
+        this.photoUris = photoUris != null ? photoUris : new ArrayList<>();
+    }
+
+    public List<String> getPhotoImageIds() { return photoImageIds; }
+    public void setPhotoImageIds(List<String> photoImageIds) {
+        this.photoImageIds = photoImageIds != null ? photoImageIds : new ArrayList<>();
+    }
 }

@@ -1,157 +1,220 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<!--
+  마이페이지 화면.
+  - 상단: background_back (공장/도시 silhouette + cream 배경)
+  - 유저 카드: summary_group_bg (흰 배경 + lime stroke)
+  - 메뉴 4개: summary_highlight_bg (lime 배경 + stroke) + summary_bullet_dot
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/mypage_framge"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_factory"
+    android:background="#8DC84A"
     tools:context=".MypageFragment">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/user_view"
-        android:layout_width="340dp"
-        android:layout_height="126dp"
-        android:layout_marginTop="197dp"
-        android:background="@drawable/mypage_user_roundable"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/mypage_framge">
+    <!-- silhouette + cream 배경 (fragment_home.xml과 동일 패턴) -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/background_back" />
 
-        <ImageView
-            android:id="@+id/user_profile"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/avatar"
-            app:layout_constraintStart_toStartOf="parent"
-            android:layout_marginStart="23dp"
-            app:layout_constraintTop_toTopOf="parent"
-            android:layout_marginTop="16dp"/>
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
-        <Button
-            android:id="@+id/button"
-            android:layout_width="147dp"
-            android:layout_height="wrap_content"
-            android:text="프로필 변경"
-            android:backgroundTint="#797979"
-            tools:layout_editor_absoluteX="139dp"
-            tools:layout_editor_absoluteY="132dp"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            android:layout_marginTop="130dp"/>
-
-        <TextView
-            android:id="@+id/textView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="닉네임"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginTop="25dp"
-            android:layout_marginStart="18dp"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toEndOf="@id/user_profile"/>
-
-        <TextView
-            android:id="@+id/user_email"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="email@gmail.com"
-            android:textSize="14sp"
-            android:textColor="#737373"
-            android:layout_marginTop="49dp"
-            android:layout_marginStart="18dp"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toEndOf="@id/user_profile"/>
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-    <LinearLayout
-        android:id="@+id/mypage_lin1"
-        android:layout_width="340dp"
-        android:layout_height="50dp"
-        android:layout_marginTop="32dp"
-        android:gravity="center_vertical"
-        android:background="@drawable/mypage_roundable"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/user_view">
-
-        <TextView
-            android:id="@+id/textView1"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="34dp"
-            android:text="기본 설정"
-            android:textSize="16sp"
-            android:textColor="#1E1E1E"
-            android:textStyle="bold"/>
-    </LinearLayout>
+            android:orientation="vertical"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="180dp"
+            android:paddingBottom="40dp">
 
-    <LinearLayout
-        android:id="@+id/mypage_lin2"
-        android:layout_width="340dp"
-        android:layout_height="50dp"
-        android:layout_marginTop="16dp"
-        android:background="@drawable/mypage_roundable"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/mypage_lin1">
+            <!-- ===== 유저 카드 ===== -->
+            <RelativeLayout
+                android:id="@+id/user_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:background="@drawable/summary_group_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:padding="18dp">
 
-        <TextView
-            android:id="@+id/textView2"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginLeft="34dp"
-            android:text="알림 설정"
-            android:textSize="16sp"
-            android:textColor="#1E1E1E"
-            android:textStyle="bold"/>
-    </LinearLayout>
+                <ImageView
+                    android:id="@+id/user_profile"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:layout_alignParentStart="true"
+                    android:background="@drawable/rounded_solid"
+                    android:backgroundTint="@color/buttoncolor1"
+                    android:contentDescription="프로필 사진"
+                    android:padding="14dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_person" />
 
-    <LinearLayout
-        android:id="@+id/mypage_lin3"
-        android:layout_width="340dp"
-        android:layout_height="50dp"
-        android:layout_marginTop="16dp"
-        android:background="@drawable/mypage_roundable"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/mypage_lin2">
+                <TextView
+                    android:id="@+id/user_nickname"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignTop="@id/user_profile"
+                    android:layout_marginStart="20dp"
+                    android:layout_marginTop="6dp"
+                    android:layout_toEndOf="@id/user_profile"
+                    android:text="닉네임"
+                    android:textColor="@color/text_color"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/textView3"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginLeft="34dp"
-            android:text="공지사항"
-            android:textSize="16sp"
-            android:textColor="#1E1E1E"
-            android:textStyle="bold"/>
-    </LinearLayout>
+                <TextView
+                    android:id="@+id/user_email"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_below="@id/user_nickname"
+                    android:layout_marginStart="20dp"
+                    android:layout_marginTop="6dp"
+                    android:layout_toEndOf="@id/user_profile"
+                    android:text="email@gmail.com"
+                    android:textColor="#9A9A9A"
+                    android:textSize="14sp" />
 
-    <LinearLayout
-        android:id="@+id/mypage_lin4"
-        android:layout_width="340dp"
-        android:layout_height="50dp"
-        android:layout_marginTop="16dp"
-        android:background="@drawable/mypage_roundable"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/mypage_lin3">
+                <ImageView
+                    android:id="@+id/user_card_arrow"
+                    android:layout_width="10dp"
+                    android:layout_height="18dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_alignParentBottom="true"
+                    android:contentDescription="프로필 편집"
+                    android:src="@drawable/ic_chevron_right" />
+            </RelativeLayout>
 
-        <TextView
-            android:id="@+id/textView4"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginLeft="34dp"
-            android:text="문의하기"
-            android:textSize="16sp"
-            android:textColor="#1E1E1E"
-            android:textStyle="bold"/>
-    </LinearLayout>
+            <!-- ===== 기본 설정 ===== -->
+            <LinearLayout
+                android:id="@+id/menu_basic_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                android:background="@drawable/summary_highlight_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+                <View
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginEnd="14dp"
+                    android:background="@drawable/summary_bullet_dot" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="기본 설정"
+                    android:textColor="@color/text_color"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- ===== 알림 설정 ===== -->
+            <LinearLayout
+                android:id="@+id/menu_notification_settings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                android:background="@drawable/summary_highlight_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <View
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginEnd="14dp"
+                    android:background="@drawable/summary_bullet_dot" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="알림 설정"
+                    android:textColor="@color/text_color"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- ===== 공지사항 ===== -->
+            <LinearLayout
+                android:id="@+id/menu_notices"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                android:background="@drawable/summary_highlight_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <View
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginEnd="14dp"
+                    android:background="@drawable/summary_bullet_dot" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="공지사항"
+                    android:textColor="@color/text_color"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- ===== 문의하기 ===== -->
+            <LinearLayout
+                android:id="@+id/menu_inquiry"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/summary_highlight_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <View
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginEnd="14dp"
+                    android:background="@drawable/summary_bullet_dot" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="문의하기"
+                    android:textColor="@color/text_color"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+</FrameLayout>

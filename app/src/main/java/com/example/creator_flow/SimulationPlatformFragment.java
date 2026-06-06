@@ -46,6 +46,11 @@ public class SimulationPlatformFragment extends Fragment {
         }
     }
 
+    // ===== Mock 데이터 주석 처리됨 — 백엔드 연결 확인용 (2026-06) =====
+    // API 호출 실패해도 fallback 안 됨 → 빈 그리드로 표시.
+    // "직접 입력" 옵션도 사라짐 (필요시 별도 처리 추가)
+    private static final List<Platform> PLATFORMS = java.util.Collections.emptyList();
+    /*
     private static final List<Platform> PLATFORMS = Arrays.asList(
             new Platform("윗치폼", "W", 5, false),
             new Platform("텀블벅", "T", 5, false),
@@ -54,6 +59,7 @@ public class SimulationPlatformFragment extends Fragment {
             new Platform("무통장", "M", 5, false),
             new Platform("직접 입력", "직", 0, true)
     );
+    */
 
     // ===== 모델 타입 인자 (Business / Fan-art) =====
     private static final String ARG_MODEL_TYPE = "model_type";
@@ -133,6 +139,9 @@ public class SimulationPlatformFragment extends Fragment {
                     public void onResponse(@NonNull Call<List<PlatformDto>> call,
                                            @NonNull Response<List<PlatformDto>> resp) {
                         if (!isAdded()) return;
+                        android.util.Log.d("PlatformApi",
+                                "GET /platforms → HTTP " + resp.code()
+                                + ", body=" + (resp.body() != null ? resp.body().size() : "null") + " items");
                         if (resp.isSuccessful() && resp.body() != null && !resp.body().isEmpty()) {
                             platformNameToId.clear();
                             apiPlatforms.clear();
@@ -159,7 +168,8 @@ public class SimulationPlatformFragment extends Fragment {
 
                     @Override
                     public void onFailure(@NonNull Call<List<PlatformDto>> call, @NonNull Throwable t) {
-                        // mock 유지
+                        android.util.Log.e("PlatformApi",
+                                "GET /platforms FAILED: " + t.getMessage());
                     }
                 });
     }
@@ -176,10 +186,16 @@ public class SimulationPlatformFragment extends Fragment {
                     public void onResponse(@NonNull Call<List<PlatformPlanDto>> call,
                                            @NonNull Response<List<PlatformPlanDto>> resp) {
                         if (!isAdded()) return;
+                        android.util.Log.d("PlatformApi",
+                                "GET /platforms/" + platformId + "/plans → HTTP " + resp.code()
+                                + ", body=" + (resp.body() != null ? resp.body().size() : "null") + " plans"
+                                + ", platform=" + platformName);
                         if (resp.isSuccessful() && resp.body() != null && !resp.body().isEmpty()) {
                             PlatformPlanDto plan = resp.body().get(0);
                             if (plan.id != null) {
                                 platformNameToPlanId.put(platformName, plan.id);
+                                android.util.Log.d("PlatformApi",
+                                        "  ★ planId 저장: " + platformName + " → " + plan.id);
                             }
                             int feePercent = plan.feeRate != null ? plan.feeRate.intValue() : 0;
                             // apiPlatforms에서 매칭되는 플랫폼 찾아 fee 업데이트
@@ -198,7 +214,8 @@ public class SimulationPlatformFragment extends Fragment {
                     @Override
                     public void onFailure(@NonNull Call<List<PlatformPlanDto>> call,
                                           @NonNull Throwable t) {
-                        // 무시
+                        android.util.Log.e("PlatformApi",
+                                "GET /platforms/" + platformId + "/plans FAILED: " + t.getMessage());
                     }
                 });
     }
@@ -306,6 +323,12 @@ public class SimulationPlatformFragment extends Fragment {
             SimulationData.platformPlanId = p.isDirectInput
                     ? null
                     : platformNameToPlanId.get(p.name);
+            android.util.Log.d("PlatformApi",
+                    "goToDelivery 시점 - platformName=" + p.name
+                    + ", isDirectInput=" + p.isDirectInput
+                    + ", apiPlatforms.size=" + apiPlatforms.size()
+                    + ", platformNameToPlanId.size=" + platformNameToPlanId.size()
+                    + ", committedPlanId=" + SimulationData.platformPlanId);
             if (p.isDirectInput) {
                 View root = getView();
                 if (root != null) {

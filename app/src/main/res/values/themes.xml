@@ -9,4 +9,31 @@
     </style>
 
     <style name="Theme.CreatorFlow" parent="Base.Theme.CreatorFlow" />
+
+    <!-- RadioButton/CheckBox/Switch에 라임 색 강제 적용용 ThemeOverlay.
+         android:theme 속성으로 적용. -->
+    <style name="LimeControlTheme" parent="ThemeOverlay.MaterialComponents">
+        <item name="colorPrimary">#7AB648</item>
+        <item name="colorAccent">#7AB648</item>
+        <item name="colorControlActivated">#7AB648</item>
+        <item name="colorControlNormal">#9A9A9A</item>
+    </style>
+
+    <!-- MaterialDatePicker용 커스텀 테마 (라임 + cream).
+         materialCalendarHeader* attribute는 Material 1.7+에서 추가되어 1.5.0에선 미사용.
+         color* attribute들로만 색 적용. -->
+    <style name="LimeMaterialCalendar" parent="ThemeOverlay.MaterialComponents.MaterialCalendar">
+        <!-- 헤더 배경 + 선택 highlight: 연한 라임 (@color/buttoncolor1 #D4EE90) -->
+        <item name="colorPrimary">#D4EE90</item>
+        <item name="colorOnPrimary">#313131</item>      <!-- 라임 위 텍스트는 진한 회색 -->
+        <item name="colorAccent">#D4EE90</item>
+
+        <!-- 다이얼로그 전체 배경: 연한 cream (@color/background #F5FAE0) -->
+        <item name="colorSurface">#F5FAE0</item>
+        <item name="colorOnSurface">#313131</item>
+
+        <!-- 다이얼로그 사이즈 축소 (퍼센트는 화면 대비) -->
+        <item name="android:windowMinWidthMajor">55%</item>
+        <item name="android:windowMinWidthMinor">75%</item>
+    </style>
 </resources>
