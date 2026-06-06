@@ -32,6 +32,7 @@ class VendorProduct(Base):
 
     id = Column(CHAR(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     vendor_id = Column(CHAR(36), ForeignKey("vendor.id"), nullable=False)
+    name = Column(String(100), nullable=False)  # 추가
     goods_type_id = Column(CHAR(36), ForeignKey("goods_type.id"), nullable=False)
     goods_detail_type_id = Column(CHAR(36), ForeignKey("goods_detail_type.id"), nullable=True)
     min_quantity = Column(Integer, nullable=False)

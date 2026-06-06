@@ -50,6 +50,13 @@ def upload_image(
         "simulation_id": project_image.simulation_id
     }
 
+@router.get("/projects/{project_id}/images")
+def get_images(project_id: str, simulation_id: str = None, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
+    query = db.query(ProjectImage).filter(ProjectImage.project_id == project_id)
+    if simulation_id:
+        query = query.filter(ProjectImage.simulation_id == simulation_id)
+    return query.order_by(ProjectImage.order).all()
+
 @router.delete("/projects/{project_id}/images/{image_id}")
 def delete_image(project_id: str, image_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     project_image = db.query(ProjectImage).filter(
