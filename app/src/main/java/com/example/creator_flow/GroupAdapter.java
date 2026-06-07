@@ -18,12 +18,24 @@ import java.util.List;
 
 public class GroupAdapter extends RecyclerView.Adapter<GroupAdapter.GroupViewHolder> {
 
+    // 롱클릭 리스너 인터페이스 정의(그룹 삭제)
+    public interface OnGroupLongClickListener {
+        void onGroupLongClick(GroupItem group, int position);
+    }
+
     private final List<GroupItem> groups;
     private final ProjectAdapter.OnProjectClickListener projectClickListener;
+    private final ProjectAdapter.OnProjectLongClickListener projectLongClickListener;
+    private final OnGroupLongClickListener groupLongClickListener;
 
-    public GroupAdapter(List<GroupItem> groups, ProjectAdapter.OnProjectClickListener projectClickListener) {
+    public GroupAdapter(List<GroupItem> groups,
+                        ProjectAdapter.OnProjectClickListener projectClickListener,
+                        ProjectAdapter.OnProjectLongClickListener projectLongClickListener,
+                        OnGroupLongClickListener groupLongClickListener) {
         this.groups = groups;
         this.projectClickListener = projectClickListener;
+        this.projectLongClickListener = projectLongClickListener;
+        this.groupLongClickListener = groupLongClickListener;
     }
 
     @NonNull
@@ -31,12 +43,21 @@ public class GroupAdapter extends RecyclerView.Adapter<GroupAdapter.GroupViewHol
     public GroupViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.item_list_group, parent, false);
-        return new GroupViewHolder(view, projectClickListener); // 뷰홀더 생성 시점에 리스너 패스
+        return new GroupViewHolder(view, projectClickListener, projectLongClickListener); // 뷰홀더 생성 시점에 리스너 패스
     }
 
     @Override
     public void onBindViewHolder(@NonNull GroupViewHolder holder, int position) {
-        holder.bind(groups.get(position));
+        GroupItem group = groups.get(position);
+        holder.bind(group);
+
+        holder.groupCardView.setOnLongClickListener(v -> {
+            if (groupLongClickListener != null) {
+                groupLongClickListener.onGroupLongClick(group, position);
+                return true;
+            }
+            return false;
+        });
     }
 
     @Override
@@ -53,7 +74,9 @@ public class GroupAdapter extends RecyclerView.Adapter<GroupAdapter.GroupViewHol
         // 하위 어댑터 재사용을 위해 뷰홀더의 멤버 변수로 승격시킵니다.
         ProjectAdapter projectAdapter;
 
-        public GroupViewHolder(@NonNull View itemView, ProjectAdapter.OnProjectClickListener listener) {
+        public GroupViewHolder(@NonNull View itemView,
+                               ProjectAdapter.OnProjectClickListener listener,
+                               ProjectAdapter.OnProjectLongClickListener projectLongClickListener) {
             super(itemView);
             groupCardView = itemView.findViewById(R.id.group_btn);
             circleIv = itemView.findViewById(R.id.circle_iv);
@@ -71,6 +94,7 @@ public class GroupAdapter extends RecyclerView.Adapter<GroupAdapter.GroupViewHol
 
             projectAdapter = new ProjectAdapter(listener);
             childRecyclerView.setAdapter(projectAdapter);
+            projectAdapter.setOnProjectLongClickListener(projectLongClickListener);
 
             childRecyclerView.setHasFixedSize(true);
             childRecyclerView.setNestedScrollingEnabled(false);
@@ -86,6 +110,7 @@ public class GroupAdapter extends RecyclerView.Adapter<GroupAdapter.GroupViewHol
             circleIv.setImageTintList(ColorStateList.valueOf(themeColor));
 
             // ProjectAdapter를 인스턴스화하지 않고, 중복 생성 방지
+            projectAdapter.setCurrentGroupId(group.getId());
             projectAdapter.updateData(group.getProjects());
 
             // 드롭다운 상태 적용
