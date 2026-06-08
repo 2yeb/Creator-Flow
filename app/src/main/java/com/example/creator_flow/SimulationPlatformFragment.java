@@ -37,29 +37,50 @@ public class SimulationPlatformFragment extends Fragment {
         final String logoLetter;
         int defaultFee;
         final boolean isDirectInput;
+        /** drawable 리소스 ID — 0이면 logoLetter(텍스트) fallback */
+        final int logoResId;
+        /** 로고 ImageView 내부 padding (dp) — 로고별 크기 균형 조정용. 기본 6dp. */
+        final int logoPaddingDp;
 
         Platform(String name, String logoLetter, int defaultFee, boolean isDirectInput) {
+            this(name, logoLetter, defaultFee, isDirectInput, 0, 6);
+        }
+
+        Platform(String name, String logoLetter, int defaultFee, boolean isDirectInput,
+                 int logoResId) {
+            this(name, logoLetter, defaultFee, isDirectInput, logoResId, 6);
+        }
+
+        Platform(String name, String logoLetter, int defaultFee, boolean isDirectInput,
+                 int logoResId, int logoPaddingDp) {
             this.name = name;
             this.logoLetter = logoLetter;
             this.defaultFee = defaultFee;
             this.isDirectInput = isDirectInput;
+            this.logoResId = logoResId;
+            this.logoPaddingDp = logoPaddingDp;
         }
     }
 
-    // ===== Mock 데이터 주석 처리됨 — 백엔드 연결 확인용 (2026-06) =====
-    // API 호출 실패해도 fallback 안 됨 → 빈 그리드로 표시.
-    // "직접 입력" 옵션도 사라짐 (필요시 별도 처리 추가)
-    private static final List<Platform> PLATFORMS = java.util.Collections.emptyList();
-    /*
+    // ===== 시연용 하드코딩 (2026-06) =====
+    // 백엔드 platforms/plans API 호출 안 함. 시연 안정성 우선.
+    // 수수료는 2026년 6월 기준 실제 시장 데이터 반영:
+    //   - 윗치폼:   0% (판매 수수료 없음)
+    //   - TMM:      0% (파도플랜으로 전환되며 무료화)
+    //   - 텀블벅:   8% (Run 5% + 결제대행 3%)
+    //   - 스마트스토어: 6% (네이버페이 3.74% + 매출연동 2%, 영세·중소 기준)
+    //   - 무통장:   0% (개인폼/구글폼 + 무통장)
+    //   - 직접 입력: 사용자가 입력
+    // 로고별 padding(dp) — 로고 원본 여백이 달라서 시각적 크기 균형 맞춤.
+    // 작은 padding = 로고가 크게 보임. 큰 padding = 로고가 작게 보임.
     private static final List<Platform> PLATFORMS = Arrays.asList(
-            new Platform("윗치폼", "W", 5, false),
-            new Platform("텀블벅", "T", 5, false),
-            new Platform("TMM", "T", 5, false),
-            new Platform("스마트 스토어", "S", 5, false),
-            new Platform("무통장", "M", 5, false),
-            new Platform("직접 입력", "직", 0, true)
+            new Platform("윗치폼",      "윗", 0, false, R.drawable.logo_witchform,  0),   // 작아 보임 → padding 줄임
+            new Platform("TMM",        "T",  0, false, R.drawable.logo_tmm,         0),
+            new Platform("텀블벅",      "텀", 8, false, R.drawable.logo_tumblbug,    0),
+            new Platform("스마트 스토어", "N",  6, false, R.drawable.logo_naverstore,  0),
+            new Platform("무통장",      "M",  0, false, R.drawable.logo_bank,        8),   // 너무 커서 줄임
+            new Platform("직접 입력",   "직",  0, true,  R.drawable.logo_pencil,    14)   // 약간 더 줄임
     );
-    */
 
     // ===== 모델 타입 인자 (Business / Fan-art) =====
     private static final String ARG_MODEL_TYPE = "model_type";
@@ -123,7 +144,8 @@ public class SimulationPlatformFragment extends Fragment {
 
         rootView = view;
         populateGrid(view);
-        loadPlatformsFromApi();
+        // 시연용 하드코딩 모드 — 백엔드 platforms API 호출 안 함 (PLATFORMS 정적 데이터 사용)
+        // loadPlatformsFromApi();
     }
 
     /**
@@ -269,7 +291,21 @@ public class SimulationPlatformFragment extends Fragment {
     }
 
     private void bindCard(View card, Platform p, int index) {
-        ((TextView) card.findViewById(R.id.tv_logo_letter)).setText(p.logoLetter);
+        // 로고: drawable 있으면 이미지 표시, 없으면 한 글자 텍스트 fallback
+        ImageView ivLogo = card.findViewById(R.id.iv_logo);
+        TextView tvLetter = card.findViewById(R.id.tv_logo_letter);
+        if (p.logoResId != 0) {
+            ivLogo.setImageResource(p.logoResId);
+            // 로고별 padding으로 시각적 크기 균형 맞춤
+            int pad = dp(p.logoPaddingDp);
+            ivLogo.setPadding(pad, pad, pad, pad);
+            ivLogo.setVisibility(View.VISIBLE);
+            tvLetter.setVisibility(View.GONE);
+        } else {
+            ivLogo.setVisibility(View.GONE);
+            tvLetter.setVisibility(View.VISIBLE);
+            tvLetter.setText(p.logoLetter);
+        }
         ((TextView) card.findViewById(R.id.tv_platform_name)).setText(p.name);
 
         TextView tvFee = card.findViewById(R.id.tv_fee);

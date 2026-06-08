@@ -268,9 +268,58 @@ public class ProjectPageFragment extends Fragment {
         refreshPhotoBox();
 
         // 서버에서 프로젝트 데이터 로드
-        if (projectId != null) loadProjectFromServer();
+        if (projectId != null) {
+            loadProjectFromServer();
+        } else {
+            // 시연용 로컬 모드 — SimulationData.lastResult 있으면 첫 차시 자동 채움
+            applyLastSimulationResultToFirstChasi();
+        }
 
         return view;
+    }
+
+    /**
+     * 시연용 로컬 모드 진입 시 호출.
+     * SimulationData에 남아있는 시뮬레이션 결과(unit_cost, vendor 이름 등)와
+     * 사용자 입력값(quantity, vendorName, platformName)을 첫 차시에 채움.
+     * 한 번 읽고 즉시 비워서 다음 진입 때 잔존하지 않게.
+     */
+    private void applyLastSimulationResultToFirstChasi() {
+        if (fileList == null || fileList.isEmpty()) return;
+        com.example.creator_flow.model.ProjectFile first = fileList.get(0);
+
+        // SimulationData 값들 (시뮬레이션 단계에서 사용자가 고른 것)
+        if (com.example.creator_flow.model.SimulationData.vendorName != null)
+            first.setVendorName(com.example.creator_flow.model.SimulationData.vendorName);
+        if (com.example.creator_flow.model.SimulationData.platformName != null)
+            first.setPlatformName(com.example.creator_flow.model.SimulationData.platformName);
+        if (com.example.creator_flow.model.SimulationData.quantity != null)
+            first.setQuantity(com.example.creator_flow.model.SimulationData.quantity);
+        if (com.example.creator_flow.model.SimulationData.platformFee != null)
+            first.setFeeRate(com.example.creator_flow.model.SimulationData.platformFee);
+        if (com.example.creator_flow.model.SimulationData.targetQuantity != null)
+            first.setTargetQuantity(com.example.creator_flow.model.SimulationData.targetQuantity);
+
+        // 시뮬레이션 응답값 (백엔드 호출 모드일 때)
+        com.example.creator_flow.model.SimulationResultDto r =
+                com.example.creator_flow.model.SimulationData.lastResult;
+        if (r != null) {
+            if (r.unitCost != null) first.setPrice(r.unitCost);
+            if (r.recommendedPrice != null) first.setSellingPrice(r.recommendedPrice);
+        }
+        // LOCAL_PROJECT_MODE에서 백엔드 응답 없을 때 fallback —
+        // detail1 vendor 카드에서 클라이언트가 계산한 단가 사용
+        if (first.getPrice() == 0
+                && com.example.creator_flow.model.SimulationData.unitCost != null) {
+            first.setPrice(com.example.creator_flow.model.SimulationData.unitCost);
+        }
+
+        // 한 번 읽었으니 비워서 다음 진입 때 잔존 안 함
+        com.example.creator_flow.model.SimulationData.lastResult = null;
+        com.example.creator_flow.model.SimulationData.unitCost = null;
+
+        // 첫 차시로 새로 전환 → EditText들 갱신
+        switchChasi(0);
     }
 
     // ── 초기화 메서드 ─────────────────────────────────────────────────────────
@@ -397,7 +446,7 @@ public class ProjectPageFragment extends Fragment {
             }
         });
 
-        // 수량 입력 감지 → 현재 차시에 저장 + 백엔드 PUT (debounce)
+        // 수량 입력 감지 → 현재 차시에 저장 + 백엔드 PUT (debounce) + BEP 차트 갱신
         etQuantity.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
@@ -408,11 +457,12 @@ public class ProjectPageFragment extends Fragment {
                     String t = s.toString();
                     fileList.get(selectedIndex).setQuantity(t.isEmpty() ? 0 : Integer.parseInt(t));
                     scheduleSaveSimulation(selectedIndex);
+                    updateChart();  // BEP 재계산 (수량 변경)
                 } catch (NumberFormatException ignored) {}
             }
         });
 
-        // 판매가 입력 감지 → 현재 차시에 저장 + 백엔드 PUT (debounce)
+        // 판매가 입력 감지 → 현재 차시에 저장 + 백엔드 PUT (debounce) + BEP 차트 갱신
         // (+ 위 profitChartWatcher가 파이차트도 갱신)
         etRetailPrice.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -424,6 +474,7 @@ public class ProjectPageFragment extends Fragment {
                     String t = s.toString();
                     fileList.get(selectedIndex).setSellingPrice(t.isEmpty() ? 0 : Integer.parseInt(t));
                     scheduleSaveSimulation(selectedIndex);
+                    updateChart();  // BEP 재계산 (판매가 변경)
                 } catch (NumberFormatException ignored) {}
             }
         });
@@ -450,7 +501,8 @@ public class ProjectPageFragment extends Fragment {
             }
         });
 
-        // 판매 수수료 입력 감지 → 현재 차시에 저장 (+ 위 profitChartWatcher가 차트도 갱신함)
+        // 판매 수수료 입력 감지 → 현재 차시에 저장 + BEP 차트 갱신
+        // (+ 위 profitChartWatcher가 파이차트도 갱신함)
         etCommission.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
@@ -460,6 +512,7 @@ public class ProjectPageFragment extends Fragment {
                 try {
                     String t = s.toString();
                     fileList.get(selectedIndex).setFeeRate(t.isEmpty() ? 0 : Double.parseDouble(t));
+                    updateChart();  // BEP 재계산 (수수료 변경)
                 } catch (NumberFormatException ignored) {}
             }
         });
@@ -1099,13 +1152,20 @@ public class ProjectPageFragment extends Fragment {
 
     // ── 차트 ──────────────────────────────────────────────────────────────────
 
+    // 단가/BEP 라인 색
+    private static final int COLOR_PRICE = 0xFF7EB4E8;   // 라이트 블루 — 단가
+    private static final int COLOR_BEP   = 0xFF0D47A1;   // 진한 파랑 (Material Blue 900) — 손익분기점
+
     /**
      * LineChart 초기 스타일을 설정한다.
      * 데이터는 updateChart()에서 채운다.
      */
     private void setupChart() {
         chartUnitPrice.setDescription(null);
-        chartUnitPrice.getLegend().setEnabled(false);
+        // 범례 활성화 — 단가/BEP 구분 표시
+        chartUnitPrice.getLegend().setEnabled(true);
+        chartUnitPrice.getLegend().setTextSize(10f);
+        chartUnitPrice.getLegend().setTextColor(0xFF555555);
         chartUnitPrice.setTouchEnabled(false);
         chartUnitPrice.setDrawGridBackground(false);
         chartUnitPrice.setBackgroundColor(Color.TRANSPARENT);
@@ -1118,69 +1178,165 @@ public class ProjectPageFragment extends Fragment {
         xAxis.setTextSize(11f);
         xAxis.setGranularity(1f);
 
-        // 왼쪽 Y축
+        // 왼쪽 Y축 — 단가 (₩)
         YAxis leftAxis = chartUnitPrice.getAxisLeft();
         leftAxis.setDrawGridLines(true);
         leftAxis.setGridColor(0xFFDDDDDD);
-        leftAxis.setTextColor(0xFF888888);
+        leftAxis.setTextColor(COLOR_PRICE);
         leftAxis.setTextSize(11f);
         leftAxis.setAxisMinimum(0f);
 
-        // 오른쪽 Y축 숨김
-        chartUnitPrice.getAxisRight().setEnabled(false);
+        // 오른쪽 Y축 — 손익분기점 (개)
+        YAxis rightAxis = chartUnitPrice.getAxisRight();
+        rightAxis.setEnabled(true);
+        rightAxis.setDrawGridLines(false);   // 좌축과 격자 충돌 방지
+        rightAxis.setTextColor(COLOR_BEP);
+        rightAxis.setTextSize(11f);
+        rightAxis.setAxisMinimum(0f);
 
         updateChart();
     }
 
     /**
-     * 각 차시의 단가 데이터를 읽어 LineChart를 갱신한다.
+     * 차시의 손익분기점(BEP)을 계산.
+     * 공식: 총 제작비 / (판매가 × (1 - 수수료율/100))
+     *  = (단가 × 수량) / (판매가 - 수수료)
+     *
+     * 데이터 부족(수량/판매가 0) 또는 단위 수익 ≤ 0 이면 0 반환 (차트에서 제외).
+     */
+    private int calculateBreakEven(ProjectFile file) {
+        int qty = file.getQuantity();
+        int sellingPrice = file.getSellingPrice();
+        double feeRate = file.getFeeRate();
+        double unitCost = file.getPrice();
+
+        if (qty == 0 || sellingPrice == 0 || unitCost == 0) return 0;
+
+        double totalProductionCost = unitCost * qty;
+        double netPerUnit = sellingPrice * (1.0 - feeRate / 100.0);
+        if (netPerUnit <= 0) return 0;
+
+        return (int) Math.ceil(totalProductionCost / netPerUnit);
+    }
+
+    /**
+     * 각 차시의 단가 + 손익분기점(BEP) 데이터를 읽어 LineChart를 갱신한다.
+     * - 단가: 왼쪽 Y축 (₩ 원)
+     * - 손익분기점: 오른쪽 Y축 (개)
      * 단가가 0인 차시는 제외하고, 최고값 포인트만 레이블을 표시한다.
      */
     private void updateChart() {
-        List<Entry> entries = new ArrayList<>();
+        List<Entry> priceEntries = new ArrayList<>();
+        List<Entry> bepEntries   = new ArrayList<>();
         String[] labels = new String[fileList.size()];
 
         for (int i = 0; i < fileList.size(); i++) {
-            double price = fileList.get(i).getPrice();
-            if (price > 0) entries.add(new Entry(i, (float) price));
-            labels[i] = fileList.get(i).getChasiNumber() + "차";
+            ProjectFile f = fileList.get(i);
+            double price = f.getPrice();
+            if (price > 0) priceEntries.add(new Entry(i, (float) price));
+            int bep = calculateBreakEven(f);
+            if (bep > 0) bepEntries.add(new Entry(i, (float) bep));
+            labels[i] = f.getChasiNumber() + "차";
         }
 
         chartUnitPrice.getXAxis().setValueFormatter(new IndexAxisValueFormatter(labels));
         chartUnitPrice.getXAxis().setLabelCount(fileList.size());
 
-        if (entries.isEmpty()) {
+        if (priceEntries.isEmpty() && bepEntries.isEmpty()) {
             chartUnitPrice.clear();
             return;
         }
 
-        // 최소값/최대값 계산 — Y축 범위 동적 조정용
+        // ===== 왼쪽 Y축 (단가) 범위 nice-step 계산 =====
+        if (!priceEntries.isEmpty()) {
+            applyNiceAxisRange(chartUnitPrice.getAxisLeft(), priceEntries);
+        }
+
+        // ===== 오른쪽 Y축 (BEP) 범위 nice-step 계산 =====
+        if (!bepEntries.isEmpty()) {
+            applyNiceAxisRange(chartUnitPrice.getAxisRight(), bepEntries);
+        }
+
+        // 단가 최댓값 (라벨 표시용)
+        final float priceMaxValue = maxYValue(priceEntries);
+        final float bepMaxValue   = maxYValue(bepEntries);
+
+        // ===== Dataset 1: 단가 (좌축) =====
+        LineDataSet priceDataSet = new LineDataSet(priceEntries, "단가 (원)");
+        priceDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
+        priceDataSet.setColor(COLOR_PRICE);
+        priceDataSet.setCircleColor(COLOR_PRICE);
+        priceDataSet.setCircleRadius(4f);
+        priceDataSet.setLineWidth(2f);
+        priceDataSet.setDrawFilled(false);
+        priceDataSet.setMode(LineDataSet.Mode.LINEAR);
+        priceDataSet.setDrawValues(true);
+        // 단가 라벨은 두 줄 prefix로 점 위쪽 멀리 표시 → BEP 라벨과 세로 분리
+        priceDataSet.setValueFormatter(new ValueFormatter() {
+            @Override public String getFormattedValue(float value) {
+                return value == priceMaxValue ? (int) value + "\n\n" : "";
+            }
+        });
+        priceDataSet.setValueTextSize(11f);
+        priceDataSet.setValueTextColor(COLOR_PRICE);
+
+        // ===== Dataset 2: 손익분기점 (우축) =====
+        LineDataSet bepDataSet = new LineDataSet(bepEntries, "손익분기점 (개)");
+        bepDataSet.setAxisDependency(YAxis.AxisDependency.RIGHT);
+        bepDataSet.setColor(COLOR_BEP);
+        bepDataSet.setCircleColor(COLOR_BEP);
+        bepDataSet.setCircleRadius(4f);
+        bepDataSet.setLineWidth(2f);
+        bepDataSet.setDrawFilled(false);
+        bepDataSet.setMode(LineDataSet.Mode.LINEAR);
+        bepDataSet.setDrawValues(true);
+        // BEP 라벨은 "개" 제거. 점 바로 위(기본 위치). 단가 라벨이 위로 가있어 안 겹침
+        bepDataSet.setValueFormatter(new ValueFormatter() {
+            @Override public String getFormattedValue(float value) {
+                return value == bepMaxValue ? String.valueOf((int) value) : "";
+            }
+        });
+        bepDataSet.setValueTextSize(11f);
+        bepDataSet.setValueTextColor(COLOR_BEP);
+
+        // 두 데이터셋 합쳐서 차트에 세팅
+        LineData data = new LineData();
+        if (!priceEntries.isEmpty()) data.addDataSet(priceDataSet);
+        if (!bepEntries.isEmpty())   data.addDataSet(bepDataSet);
+
+        chartUnitPrice.setData(data);
+        chartUnitPrice.invalidate();
+    }
+
+    /** Entry 리스트의 최대 Y값 반환 (빈 리스트면 0) */
+    private float maxYValue(List<Entry> entries) {
+        float max = 0;
+        for (Entry e : entries) if (e.getY() > max) max = e.getY();
+        return max;
+    }
+
+    /**
+     * Y축에 nice step 범위 적용 (250, 500, 1000 같이 깔끔한 라벨).
+     * updateChart() 안에서 좌/우 두 축 공통 사용.
+     */
+    private void applyNiceAxisRange(YAxis axis, List<Entry> entries) {
         float minVal = Float.MAX_VALUE;
         float maxVal = Float.MIN_VALUE;
         for (Entry e : entries) {
             if (e.getY() < minVal) minVal = e.getY();
             if (e.getY() > maxVal) maxVal = e.getY();
         }
-        final float maxValue = maxVal;
-
-        // Y축 범위 동적 설정 — nice step (1, 2, 2.5, 5 의 10의 거듭제곱 배수)
-        // → 라벨이 250, 500, 1000, 2500, 5000 같이 십단위가 0 또는 5로 떨어짐
-        YAxis leftAxis = chartUnitPrice.getAxisLeft();
         float dataMin = minVal;
         float dataMax = maxVal;
         if (dataMax == dataMin) {
-            // 단일 값 → 양옆으로 25% 가상 range
             float half = Math.max(dataMax * 0.25f, 100f);
             dataMin -= half;
             dataMax += half;
         } else {
-            // 여러 값 → 데이터 위아래로 25% 여백 추가 (데이터가 가장자리에 붙지 않게)
             float pad = (dataMax - dataMin) * 0.25f;
             dataMin -= pad;
             dataMax += pad;
         }
-
-        // 약 4개 라벨 기준 step 후보 계산
         float roughStep = (dataMax - dataMin) / 4f;
         float magnitude = (float) Math.pow(10, Math.floor(Math.log10(roughStep)));
         float fraction = roughStep / magnitude;
@@ -1192,38 +1348,15 @@ public class ProjectPageFragment extends Fragment {
         else                       niceFraction = 10f;
         float step = niceFraction * magnitude;
 
-        // min을 step 배수로 내림, max를 step 배수로 올림
         float niceMin = (float) Math.floor(dataMin / step) * step;
         float niceMax = (float) Math.ceil(dataMax / step) * step;
         niceMin = Math.max(0f, niceMin);
 
-        leftAxis.setAxisMinimum(niceMin);
-        leftAxis.setAxisMaximum(niceMax);
-        leftAxis.setGranularity(step);
+        axis.setAxisMinimum(niceMin);
+        axis.setAxisMaximum(niceMax);
+        axis.setGranularity(step);
         int labelCount = (int) Math.round((niceMax - niceMin) / step) + 1;
-        leftAxis.setLabelCount(labelCount, true);
-
-        LineDataSet dataSet = new LineDataSet(entries, "단가");
-        dataSet.setColor(0xFF7EB4E8);
-        dataSet.setCircleColor(0xFF7EB4E8);
-        dataSet.setCircleRadius(4f);
-        dataSet.setLineWidth(2f);
-        dataSet.setDrawFilled(false);
-        dataSet.setMode(LineDataSet.Mode.LINEAR);
-        dataSet.setDrawValues(true);
-
-        // 최고값만 레이블 표시
-        dataSet.setValueFormatter(new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return value == maxValue ? String.valueOf((int) value) : "";
-            }
-        });
-        dataSet.setValueTextSize(11f);
-        dataSet.setValueTextColor(Color.BLACK);
-
-        chartUnitPrice.setData(new LineData(dataSet));
-        chartUnitPrice.invalidate();
+        axis.setLabelCount(labelCount, true);
     }
 
     /**
