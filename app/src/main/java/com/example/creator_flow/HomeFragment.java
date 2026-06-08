@@ -121,6 +121,8 @@ public class HomeFragment extends Fragment {
         view.findViewById(R.id.fee_btn).setOnClickListener(rowClickListener);
         view.findViewById(R.id.target_btn).setOnClickListener(rowClickListener);
 
+        feeSpinner.post(() ->
+                feeSpinner.setDropDownWidth(feeSpinner.getWidth()));
         // 스피너 아이템 선택 이벤트 처리
         feeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -178,11 +180,31 @@ public class HomeFragment extends Fragment {
         // 물음표 클릭 이벤트(부자재비)
         view.findViewById(R.id.help_sub_material_btn).setOnClickListener(v -> {
             showDescription("부자재비", "포장지, 테이프, 택배 박스 등 소모품 비용입니다.");
+            // 3초(3000ms) 동안 대기한 후, 0.5초(500ms) 동안 페이드 아웃 실행
+            cardDescription.animate()
+                    .alpha(0.0f) // 투명도
+                    .setDuration(500)
+                    .setStartDelay(3000)// 대기 시간
+                    .withEndAction(() -> {
+                        // 애니메이션이 완전히 끝난 후 실행될 작업
+                        cardDescription.setVisibility(View.GONE);
+                    })
+                    .start();
         });
 
         // 물음표 클릭 이벤트(수수료율)
         view.findViewById(R.id.help_fee_btn).setOnClickListener(v -> {
             showDescription("수수료율", "판매 플랫폼의 수수료입니다.");
+            // 3초(3000ms) 동안 대기한 후, 0.5초(500ms) 동안 페이드 아웃 실행
+            cardDescription.animate()
+                    .alpha(0.0f) // 투명도
+                    .setDuration(500)
+                    .setStartDelay(3000)// 대기 시간
+                    .withEndAction(() -> {
+                        // 애니메이션이 완전히 끝난 후 실행될 작업
+                        cardDescription.setVisibility(View.GONE);
+                    })
+                    .start();
         });
 
         // 초기화 버튼 찾기 및 리스너 연결
@@ -242,15 +264,10 @@ public class HomeFragment extends Fragment {
 
     // 설명칸 클릭 이벤트
     private void showDescription(String title, String body) {
-        // 이미 같은 설명이 보이고 있다면 닫기 (토글 기능)
-        if (cardDescription.getVisibility() == View.VISIBLE && titleDescription.getText().equals(title)) {
-            cardDescription.setVisibility(View.GONE);
-        } else {
-            // 내용 셋팅 후 보여주기
-            titleDescription.setText(title);
-            bodyDescription.setText(body);
-            cardDescription.setVisibility(View.VISIBLE);
-        }
+        titleDescription.setText(title);
+        bodyDescription.setText(body);
+        cardDescription.setAlpha(1.0f);
+        cardDescription.setVisibility(View.VISIBLE);
     }
 
     // home 화면 내 계산기 내용 모두 리셋

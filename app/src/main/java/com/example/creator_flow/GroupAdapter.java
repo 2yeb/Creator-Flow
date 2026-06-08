@@ -2,6 +2,7 @@ package com.example.creator_flow;
 
 import android.content.Context;
 import android.content.res.ColorStateList;
+import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -105,9 +106,14 @@ public class GroupAdapter extends RecyclerView.Adapter<GroupAdapter.GroupViewHol
 
             groupNameTv.setText(group.getKeyword());
 
-            int themeColor = ContextCompat.getColor(context, group.getColorResId());
-            groupCardView.setCardBackgroundColor(ColorStateList.valueOf(themeColor));
-            circleIv.setImageTintList(ColorStateList.valueOf(themeColor));
+            int bgColor = ContextCompat.getColor(context, group.getBackgroundColor());
+            groupCardView.setCardBackgroundColor(bgColor);
+
+            // 진한 포인트색 적용 (원, 화살표, 텍스트)
+            int pointColor = ContextCompat.getColor(context, group.getStrokePointColor());
+            circleIv.setColorFilter(pointColor, PorterDuff.Mode.SRC_IN);     // 원 색상 변경
+            dropdownIv.setColorFilter(pointColor, PorterDuff.Mode.SRC_IN);   // 화살표 색상 변경
+
 
             // ProjectAdapter를 인스턴스화하지 않고, 중복 생성 방지
             projectAdapter.setCurrentGroupId(group.getId());
