@@ -25,6 +25,7 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 import java.text.NumberFormat;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -240,7 +241,8 @@ public class SimulationBusinessFragment extends Fragment {
                 // 시연용 로컬 모드: 결과를 보관 → ProjectPageFragment 첫 차시 자동 채움용
                 SimulationData.lastResult = r;
                 android.util.Log.d("SimulationConfirm",
-                        "✅ 시뮬레이션 OK: simulation_id=" + r.simulationId);
+                        "✅ 시뮬레이션 OK: simulation_id=" + r.simulationId
+                        + ", recommended=" + r.recommendedPrice);
 
                 if (LOCAL_PROJECT_MODE) {
                     // 시연용 로컬 모드 — 백엔드 프로젝트 API 호출 스킵
@@ -250,13 +252,11 @@ public class SimulationBusinessFragment extends Fragment {
                     return;
                 }
 
-                if (capturedTargetProjectId != null) {
-                    // Flow B: 기존 프로젝트에 차시 attach 완료 — 그 프로젝트로 이동
-                    finishAndNavigate(capturedTargetProjectId);
-                } else {
-                    // Flow A: 새 프로젝트 생성 후 그 프로젝트로 이동
-                    createProjectAndNavigate(r.simulationId);
-                }
+                // 백엔드 시그니처 한계: POST /simulations은 selling_price를 0으로 보내야 하고,
+                // 백엔드는 그 0을 DB에 그대로 저장 (recommended_price와 분리).
+                // → 후속 PUT으로 selling_price = recommended_price 업데이트해야
+                //   GET /projects/{id}에서 selling_price 정상값 들어옴.
+                updateSellingPriceThenNavigate(r, capturedTargetProjectId);
             }
 
             @Override
@@ -269,10 +269,109 @@ public class SimulationBusinessFragment extends Fragment {
         });
     }
 
-    /** POST /simulations/{id}/project 호출 후 응답의 project_id로 navigate. */
+    /**
+     * POST /simulations 응답 직후 selling_price를 recommended_price로 PUT 업데이트.
+     * 그 다음 (chain) 프로젝트 생성 또는 차시 attach 흐름 진행.
+     *
+     * 이유: 백엔드는 POST 시 받은 selling_price=0을 그대로 DB에 저장하고
+     * recommended_price는 응답에만 반환. PUT 안 하면 GET 응답 selling_price = 0.
+     */
+    private void updateSellingPriceThenNavigate(SimulationResultDto r, String capturedTargetProjectId) {
+        if (r.recommendedPrice == null || r.recommendedPrice <= 0) {
+            // recommended_price 없으면 PUT 스킵하고 다음 단계
+            navigateAfterSimulation(r.simulationId, capturedTargetProjectId);
+            return;
+        }
+        android.util.Log.d("SimulationConfirm",
+                "→ PUT /simulations/" + r.simulationId + " selling_price=" + r.recommendedPrice);
+        RetrofitClient.getApi(requireContext())
+                .updateSimulation(r.simulationId, null, r.recommendedPrice, null, null)
+                .enqueue(new Callback<SimulationDetailDto>() {
+                    @Override
+                    public void onResponse(@NonNull Call<SimulationDetailDto> call,
+                                           @NonNull Response<SimulationDetailDto> resp) {
+                        if (!isAdded()) return;
+                        android.util.Log.d("SimulationConfirm",
+                                "← PUT selling_price 응답: HTTP " + resp.code());
+                        navigateAfterSimulation(r.simulationId, capturedTargetProjectId);
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<SimulationDetailDto> call,
+                                          @NonNull Throwable t) {
+                        if (!isAdded()) return;
+                        android.util.Log.w("SimulationConfirm",
+                                "← PUT selling_price FAILED: " + t.getMessage());
+                        // 그래도 다음 단계 진행 (selling_price만 0으로 남음)
+                        navigateAfterSimulation(r.simulationId, capturedTargetProjectId);
+                    }
+                });
+    }
+
+    /** PUT 완료 후 호출되는 분기 처리 */
+    private void navigateAfterSimulation(String simulationId, String capturedTargetProjectId) {
+        if (capturedTargetProjectId != null) {
+            finishAndNavigate(capturedTargetProjectId);
+        } else {
+            createProjectAndNavigate(simulationId);
+        }
+    }
+
+    /**
+     * POST /simulations/{id}/project 호출 후 응답의 project_id로 navigate.
+     * 이름은 GET /projects로 기존 개수 받아 "프로젝트{N}" 형식으로 자동 부여.
+     */
     private void createProjectAndNavigate(String simulationId) {
         if (getContext() == null) return;
-        String name = buildProjectName();
+        // 1단계: 기존 프로젝트 목록 받아 다음 번호 결정
+        RetrofitClient.getApi(requireContext())
+                .getProjects()
+                .enqueue(new Callback<List<ProjectListResponse>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<List<ProjectListResponse>> call,
+                                           @NonNull Response<List<ProjectListResponse>> resp) {
+                        if (!isAdded()) return;
+                        int nextNum = computeNextProjectNumber(resp.body());
+                        String name = "프로젝트" + nextNum;
+                        postCreateProject(simulationId, name);
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<List<ProjectListResponse>> call,
+                                          @NonNull Throwable t) {
+                        if (!isAdded()) return;
+                        // 목록 조회 실패해도 진행 — 안전 fallback으로 "프로젝트1"
+                        android.util.Log.w("SimulationConfirm",
+                                "GET /projects FAILED, fallback 프로젝트1: " + t.getMessage());
+                        postCreateProject(simulationId, "프로젝트1");
+                    }
+                });
+    }
+
+    /**
+     * 기존 프로젝트 이름 중 "프로젝트{N}" 패턴의 최대 N을 찾아 N+1 반환.
+     * 패턴이 하나도 없으면 1 반환.
+     */
+    private int computeNextProjectNumber(@Nullable List<ProjectListResponse> projects) {
+        int maxN = 0;
+        if (projects != null) {
+            java.util.regex.Pattern p = java.util.regex.Pattern.compile("^프로젝트(\\d+)$");
+            for (ProjectListResponse pr : projects) {
+                if (pr == null || pr.getName() == null) continue;
+                java.util.regex.Matcher m = p.matcher(pr.getName().trim());
+                if (m.matches()) {
+                    try {
+                        int n = Integer.parseInt(m.group(1));
+                        if (n > maxN) maxN = n;
+                    } catch (NumberFormatException ignore) { /* skip */ }
+                }
+            }
+        }
+        return maxN + 1;
+    }
+
+    /** 실제 POST /simulations/{id}/project 호출. createProjectAndNavigate의 2단계. */
+    private void postCreateProject(String simulationId, String name) {
         android.util.Log.d("SimulationConfirm",
                 "→ POST /simulations/" + simulationId + "/project?name=\"" + name + "\"");
         RetrofitClient.getApi(requireContext())
@@ -340,33 +439,4 @@ public class SimulationBusinessFragment extends Fragment {
         }
     }
 
-    /**
-     * SimulationData 값들로 프로젝트 이름 자동 생성.
-     * 예: "스티커 100개 · 레드프린팅 · 텀블벅 (5%)"
-     */
-    private String buildProjectName() {
-        StringBuilder sb = new StringBuilder();
-        if (SimulationData.goodsType != null) {
-            sb.append(SimulationData.goodsType);
-        }
-        if (SimulationData.quantity != null) {
-            if (sb.length() > 0) sb.append(" ");
-            sb.append(SimulationData.quantity).append("개");
-        }
-        if (SimulationData.vendorName != null) {
-            if (sb.length() > 0) sb.append(" · ");
-            sb.append(SimulationData.vendorName);
-        }
-        if (SimulationData.platformName != null) {
-            if (sb.length() > 0) sb.append(" · ");
-            sb.append(SimulationData.platformName);
-            if (SimulationData.platformFee != null) {
-                sb.append(" (").append(SimulationData.platformFee).append("%)");
-            }
-        }
-        if (sb.length() == 0) {
-            sb.append("Simulation - ").append(System.currentTimeMillis());
-        }
-        return sb.toString();
-    }
 }

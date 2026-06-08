@@ -594,6 +594,8 @@ public class SimulationDetail1Fragment extends Fragment {
                             vendorNameToId.clear();
                             vendorNameToLogoUrl.clear();
                             for (VendorDto v : resp.body()) {
+                                android.util.Log.d("VendorLogo",
+                                        "API " + v.name + " | logoUrl=" + v.logoUrl);
                                 if (v.name != null && v.id != null) {
                                     vendorNameToId.put(v.name, v.id);
                                     if (v.logoUrl != null && !v.logoUrl.isEmpty()) {
@@ -1066,15 +1068,26 @@ public class SimulationDetail1Fragment extends Fragment {
 
         card.setBackgroundTintList(android.content.res.ColorStateList.valueOf(vendor.cardBgColor));
 
-        // 로고 박스: brandColor를 fallback으로 사용, logoUrl 있으면 Glide로 덮어 그림
+        // 로고 박스: PNG/JPG/WebP만 Glide로 로드. SVG/빈값은 brandColor 박스.
+        // (Glide는 기본적으로 SVG 디코딩 미지원 → 별도 라이브러리 추가 전엔 색 박스로 fallback)
         android.widget.ImageView logoBox = card.findViewById(R.id.vendor_color_box);
-        logoBox.setBackgroundTintList(android.content.res.ColorStateList.valueOf(vendor.brandColor));
-        if (vendor.logoUrl != null && !vendor.logoUrl.isEmpty()) {
+        boolean hasRasterLogo = vendor.logoUrl != null
+                && !vendor.logoUrl.isEmpty()
+                && !vendor.logoUrl.toLowerCase().endsWith(".svg");
+        if (hasRasterLogo) {
+            logoBox.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(Color.WHITE));
+            logoBox.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            logoBox.setPadding(dp(2), dp(2), dp(2), dp(2));
             com.bumptech.glide.Glide.with(this)
                     .load(vendor.logoUrl)
+                    .fitCenter()
                     .into(logoBox);
         } else {
-            logoBox.setImageDrawable(null);  // mock 모드: 이미지 비우고 색 박스만 보임
+            // SVG 또는 빈 URL → brandColor 박스
+            logoBox.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(vendor.brandColor));
+            logoBox.setImageDrawable(null);
         }
 
         ((TextView) card.findViewById(R.id.tv_vendor_name)).setText(vendor.name);

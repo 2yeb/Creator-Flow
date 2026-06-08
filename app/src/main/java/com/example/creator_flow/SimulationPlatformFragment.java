@@ -35,23 +35,24 @@ public class SimulationPlatformFragment extends Fragment {
     private static class Platform {
         final String name;
         final String logoLetter;
-        int defaultFee;
+        /** 수수료율(%) — 소수점 유지를 위해 double */
+        double defaultFee;
         final boolean isDirectInput;
         /** drawable 리소스 ID — 0이면 logoLetter(텍스트) fallback */
         final int logoResId;
         /** 로고 ImageView 내부 padding (dp) — 로고별 크기 균형 조정용. 기본 6dp. */
         final int logoPaddingDp;
 
-        Platform(String name, String logoLetter, int defaultFee, boolean isDirectInput) {
+        Platform(String name, String logoLetter, double defaultFee, boolean isDirectInput) {
             this(name, logoLetter, defaultFee, isDirectInput, 0, 6);
         }
 
-        Platform(String name, String logoLetter, int defaultFee, boolean isDirectInput,
+        Platform(String name, String logoLetter, double defaultFee, boolean isDirectInput,
                  int logoResId) {
             this(name, logoLetter, defaultFee, isDirectInput, logoResId, 6);
         }
 
-        Platform(String name, String logoLetter, int defaultFee, boolean isDirectInput,
+        Platform(String name, String logoLetter, double defaultFee, boolean isDirectInput,
                  int logoResId, int logoPaddingDp) {
             this.name = name;
             this.logoLetter = logoLetter;
@@ -62,25 +63,38 @@ public class SimulationPlatformFragment extends Fragment {
         }
     }
 
+    /** 수수료를 "8" / "4.68" 형식으로 포맷 (정수면 .0 안 붙임) */
+    private static String formatFee(double fee) {
+        if (fee == (long) fee) return String.valueOf((long) fee);
+        return String.valueOf(fee);
+    }
+
     // ===== 시연용 하드코딩 (2026-06) =====
-    // 백엔드 platforms/plans API 호출 안 함. 시연 안정성 우선.
-    // 수수료는 2026년 6월 기준 실제 시장 데이터 반영:
-    //   - 윗치폼:   0% (판매 수수료 없음)
-    //   - TMM:      0% (파도플랜으로 전환되며 무료화)
-    //   - 텀블벅:   8% (Run 5% + 결제대행 3%)
-    //   - 스마트스토어: 6% (네이버페이 3.74% + 매출연동 2%, 영세·중소 기준)
-    //   - 무통장:   0% (개인폼/구글폼 + 무통장)
-    //   - 직접 입력: 사용자가 입력
-    // 로고별 padding(dp) — 로고 원본 여백이 달라서 시각적 크기 균형 맞춤.
-    // 작은 padding = 로고가 크게 보임. 큰 padding = 로고가 작게 보임.
-    private static final List<Platform> PLATFORMS = Arrays.asList(
-            new Platform("윗치폼",      "윗", 0, false, R.drawable.logo_witchform,  0),   // 작아 보임 → padding 줄임
-            new Platform("TMM",        "T",  0, false, R.drawable.logo_tmm,         0),
-            new Platform("텀블벅",      "텀", 8, false, R.drawable.logo_tumblbug,    0),
-            new Platform("스마트 스토어", "N",  6, false, R.drawable.logo_naverstore,  0),
-            new Platform("무통장",      "M",  0, false, R.drawable.logo_bank,        8),   // 너무 커서 줄임
-            new Platform("직접 입력",   "직",  0, true,  R.drawable.logo_pencil,    14)   // 약간 더 줄임
-    );
+    // ============= 이름/수수료는 백엔드, 로고만 클라이언트 매핑 =============
+    // GET /platforms 로 이름·수수료·plan_id 받음. 로고는 백엔드 응답 platform name 기준 매핑.
+    private static final List<Platform> PLATFORMS = java.util.Collections.emptyList();
+
+    /** platform name → 로고 drawable resource id */
+    private static final java.util.Map<String, Integer> PLATFORM_LOGO_RES =
+            new java.util.HashMap<String, Integer>() {{
+                put("윗치폼",            R.drawable.logo_witchform);
+                put("TMM",              R.drawable.logo_tmm);
+                put("텀블벅",            R.drawable.logo_tumblbug);
+                put("네이버 스마트스토어", R.drawable.logo_naverstore);
+                put("개인폼(무통장)",    R.drawable.logo_bank);
+                put("직접 입력",         R.drawable.logo_pencil);
+            }};
+
+    /** platform name → 로고 padding (시각적 크기 균형) */
+    private static final java.util.Map<String, Integer> PLATFORM_LOGO_PADDING_DP =
+            new java.util.HashMap<String, Integer>() {{
+                put("윗치폼",            0);
+                put("TMM",              0);
+                put("텀블벅",            0);
+                put("네이버 스마트스토어", 0);
+                put("개인폼(무통장)",    8);
+                put("직접 입력",         14);
+            }};
 
     // ===== 모델 타입 인자 (Business / Fan-art) =====
     private static final String ARG_MODEL_TYPE = "model_type";
@@ -144,10 +158,8 @@ public class SimulationPlatformFragment extends Fragment {
 
         rootView = view;
         populateGrid(view);
-        // 화면은 PLATFORMS 하드코딩 유지하되, 백엔드 호출은 살려서 platform_plan_id만 받음.
-        // → goToDelivery()에서 사용자 선택 플랫폼 이름과 매칭 시 plan_id를 SimulationData에 commit.
-        // → POST /simulations 호출이 정상 동작해서 ProjectPage가 백엔드 단가를 받을 수 있음.
-        loadPlatformIdsOnly();
+        // 이름·수수료·plan_id 모두 백엔드 API에서 받음. 로고만 클라이언트 매핑.
+        loadPlatformsFromApi();
     }
 
     /**
@@ -203,12 +215,19 @@ public class SimulationPlatformFragment extends Fragment {
                             for (PlatformDto p : resp.body()) {
                                 if (p.name == null || p.id == null) continue;
                                 platformNameToId.put(p.name, p.id);
-                                // API 플랫폼은 직접 입력 아님 (사용자 정의 항목 제외)
+
+                                // 로고 매핑 (클라이언트 보유 drawable)
+                                Integer logoRes = PLATFORM_LOGO_RES.get(p.name);
+                                Integer paddingDp = PLATFORM_LOGO_PADDING_DP.get(p.name);
+                                boolean isDirectInput = "직접 입력".equals(p.name);
+
                                 Platform platform = new Platform(
-                                        p.name,
-                                        p.name.substring(0, 1),  // 첫 글자
-                                        0,                        // 수수료: plan 응답 기다림
-                                        false
+                                        p.name,                       // 이름: 백엔드
+                                        p.name.substring(0, 1),       // 텍스트 fallback (로고 없을 때)
+                                        0,                            // 수수료: plan 응답 기다림
+                                        isDirectInput,                // 직접 입력 카드 인식
+                                        logoRes != null ? logoRes : 0,
+                                        paddingDp != null ? paddingDp : 6
                                 );
                                 apiPlatforms.add(platform);
                                 loadPlatformPlansForId(p.name, p.id);
@@ -251,13 +270,13 @@ public class SimulationPlatformFragment extends Fragment {
                                 android.util.Log.d("PlatformApi",
                                         "  ★ planId 저장: " + platformName + " → " + plan.id);
                             }
-                            int feePercent = plan.feeRate != null ? plan.feeRate.intValue() : 0;
+                            // 소수점 유지 (4.68% 같은 값 보존)
+                            double feePercent = plan.feeRate != null ? plan.feeRate : 0;
                             // apiPlatforms에서 매칭되는 플랫폼 찾아 fee 업데이트
                             for (int i = 0; i < apiPlatforms.size(); i++) {
                                 Platform p = apiPlatforms.get(i);
                                 if (platformName.equals(p.name)) {
                                     p.defaultFee = feePercent;
-                                    // 화면의 해당 카드 tv_fee 업데이트
                                     updateCardFee(i, feePercent);
                                     break;
                                 }
@@ -275,13 +294,13 @@ public class SimulationPlatformFragment extends Fragment {
     }
 
     /** apiPlatforms의 i번째 카드의 fee 텍스트 in-place 업데이트 */
-    private void updateCardFee(int index, int feePercent) {
+    private void updateCardFee(int index, double feePercent) {
         if (index < 0 || index >= cardViews.size()) return;
         View card = cardViews.get(index);
         if (card == null) return;
         TextView tvFee = card.findViewById(R.id.tv_fee);
         if (tvFee != null && tvFee.getVisibility() == View.VISIBLE) {
-            tvFee.setText(feePercent + "%");
+            tvFee.setText(formatFee(feePercent) + "%");
         }
     }
 
@@ -356,7 +375,7 @@ public class SimulationPlatformFragment extends Fragment {
             });
         } else {
             tvFee.setVisibility(View.VISIBLE);
-            tvFee.setText(p.defaultFee + "%");
+            tvFee.setText(formatFee(p.defaultFee) + "%");
             feeInputRow.setVisibility(View.GONE);
         }
 
@@ -413,9 +432,10 @@ public class SimulationPlatformFragment extends Fragment {
                     EditText etFee = root.findViewById(R.id.et_fee);
                     if (etFee != null) {
                         try {
-                            SimulationData.platformFee = Integer.parseInt(etFee.getText().toString().trim());
+                            SimulationData.platformFee = Double.parseDouble(
+                                    etFee.getText().toString().trim());
                         } catch (NumberFormatException ignored) {
-                            SimulationData.platformFee = 0;
+                            SimulationData.platformFee = 0.0;
                         }
                     }
                 }

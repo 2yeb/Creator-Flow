@@ -30,5 +30,5 @@ public class NetworkConfig {
      *   - TokenManager.saveToken()으로 동적 저장
      *   - 이 상수는 삭제
      */
-    public static final String DEV_TOKEN = "";   // 시현 시엔 토큰 박아넣기
+    public static final String DEV_TOKEN = "";   // 시현 시엔 토큰 박아넣기 이렇게 깃허브에 올리자
 }
