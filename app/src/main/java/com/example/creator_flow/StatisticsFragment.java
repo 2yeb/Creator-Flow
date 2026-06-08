@@ -62,10 +62,13 @@ public class StatisticsFragment extends Fragment {
         fetchProjectsFromServer();
         fetchTodosFromServer();
 
-        // 프로젝트 추가 버튼 삭제(GONE 처리)
-        if (binding.projectAddBtn != null) {
-            binding.projectAddBtn.setVisibility(View.GONE);
-        }
+        // 프로젝트 추가 버튼 -> simulation 페이지로 이동
+        binding.projectAddBtn.setOnClickListener(v -> {
+            getActivity().getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.main_fragment, new SimulationFragment())
+                    .addToBackStack(null)
+                    .commit();
+        });
 
         // To-Do 추가 버튼
         binding.todoAddBtn.setOnClickListener(v -> {

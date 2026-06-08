@@ -16,7 +16,6 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.example.creator_flow.model.ProjectResponse;
 import com.example.creator_flow.network.ApiService;
 import com.example.creator_flow.network.RetrofitClient;
 
@@ -447,7 +446,7 @@ public class GroupListFragment extends Fragment {
                     GroupItem selectedGroup = targetGroups.get(which);
                     String targetGroupId = selectedGroup.getId();
 
-                    // [체크] 선택한 대상이 '기타/미분류' 그룹인지 판별 (ID 또는 키워드 이름 기준)
+                    // [체크] 선택한 대상이 '기타' 그룹인지 판별 (ID 또는 키워드 이름 기준)
                     boolean isTargetUnclassified = "unclassified_dummy_id".equals(targetGroupId)
                             || "기타".equals(selectedGroup.getKeyword());
 
@@ -472,16 +471,18 @@ public class GroupListFragment extends Fragment {
                     // 다른 그룹을 선택한 경우
                     // --------------------------------------------------------
                     if (isTargetUnclassified) {
-                        // 1. 정식 그룹 -> 기타 그룹으로 이동 (untag)
+                        // [케이스 A] 정식 그룹 -> 기타 그룹으로 이동
                         if (!isCurrentUnclassified) {
                             apiService.untagGroup(project.getId(), currentGroupId).enqueue(new Callback<JsonObject>() {
                                 @Override
                                 public void onResponse(@NonNull Call<JsonObject> call, @NonNull Response<JsonObject> response) {
                                     if (response.isSuccessful() && isAdded()) {
                                         Toast.makeText(getContext(), "그룹 지정이 해제되었습니다.", Toast.LENGTH_SHORT).show();
-                                        fetchGroupListFromServer(); // UI 갱신
+
+                                        // API 변경이 불가능하므로 로컬 메모리에서 프로젝트 위치를 강제로 이동
+                                        moveProjectInLocalMemory(project, currentGroupId, targetGroupId);
                                     } else {
-                                        if (isAdded()) Toast.makeText(getContext(), "그룹 해제 실패 (서버 오류)", Toast.LENGTH_SHORT).show();
+                                        if (isAdded()) Toast.makeText(getContext(), "그룹 해제 실패", Toast.LENGTH_SHORT).show();
                                     }
                                 }
 
@@ -492,28 +493,27 @@ public class GroupListFragment extends Fragment {
                             });
                         }
                     } else {
-                        // 2. 다른 그룹으로 이동하는 경우
+                        // [케이스 B] 다른 정식 그룹으로 이동하는 경우 (기존 매핑 해제 후 새 매핑 등록)
                         if (!isCurrentUnclassified) {
                             apiService.untagGroup(project.getId(), currentGroupId).enqueue(new Callback<JsonObject>() {
                                 @Override
                                 public void onResponse(@NonNull Call<JsonObject> call, @NonNull Response<JsonObject> response) {
                                     if (response.isSuccessful() && isAdded()) {
-                                        executeTagGroup(project.getId(), targetGroupId);
+                                        executeTagGroup(project, currentGroupId, targetGroupId);
                                     } else {
-                                        // 안전장치: 혹시 서버 데이터가 꼬여 untag가 실패하더라도 일단 tag를 시도
-                                        if (isAdded()) executeTagGroup(project.getId(), targetGroupId);
+                                        // 예외 방어: 서버 DB가 어떤 이유로 비어있어 DELETE가 실패하더라도 POST 등록을 이어서 진행시킵니다.
+                                        executeTagGroup(project, currentGroupId, targetGroupId);
                                     }
                                 }
 
                                 @Override
                                 public void onFailure(@NonNull Call<JsonObject> call, @NonNull Throwable t) {
-                                    // 네트워크 끊김 시에는 진행 불가
-                                    if (isAdded()) Toast.makeText(getContext(), "네트워크 상태를 확인해 주세요.", Toast.LENGTH_SHORT).show();
+                                    if (isAdded()) Toast.makeText(getContext(), "네트워크 통신 실패", Toast.LENGTH_SHORT).show();
                                 }
                             });
                         } else {
-                            // 기존에 '기타' 상태였다면 떼어낼 태그가 없으므로 곧바로 새 그룹 태그만 수행.
-                            executeTagGroup(project.getId(), targetGroupId);
+                            // 원래 '기타' 상태였다면 끊어낼 행이 없으므로 바로 새 그룹 태그 수행
+                            executeTagGroup(project, currentGroupId, targetGroupId);
                         }
                     }
                 })
@@ -524,27 +524,79 @@ public class GroupListFragment extends Fragment {
     /**
      * 프로젝트에 새로운 그룹 태그를 등록
      */
-    private void executeTagGroup(String projectId, String targetGroupId) {
-        apiService.tagGroup(projectId, targetGroupId).enqueue(new Callback<JsonObject>() {
+    private void executeTagGroup(ProjectItem project, String oldGroupId, String targetGroupId) {
+        apiService.tagGroup(project.getId(), targetGroupId).enqueue(new Callback<JsonObject>() {
             @Override
             public void onResponse(@NonNull Call<JsonObject> call, @NonNull Response<JsonObject> response) {
                 if (response.isSuccessful() && isAdded()) {
                     Toast.makeText(getContext(), "그룹이 변경되었습니다.", Toast.LENGTH_SHORT).show();
-                    // 데이터를 받아와 UI 갱신
-                    fetchGroupListFromServer();
+
+                    // API 변경이 불가능하므로 로컬 메모리에서 프로젝트 위치를 강제로 이동
+                    moveProjectInLocalMemory(project, oldGroupId, targetGroupId);
                 } else {
-                    if (isAdded()) {
-                        Toast.makeText(getContext(), "새 그룹 태그 등록 실패", Toast.LENGTH_SHORT).show();
-                    }
+                    if (isAdded()) Toast.makeText(getContext(), "새 그룹 지정 실패", Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<JsonObject> call, @NonNull Throwable t) {
-                if (isAdded()) {
-                    Toast.makeText(getContext(), "네트워크 통신 실패", Toast.LENGTH_SHORT).show();
-                }
+                if (isAdded()) Toast.makeText(getContext(), "네트워크 통신 실패", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void moveProjectInLocalMemory(ProjectItem project, String oldGroupId, String targetGroupId) {
+        if (groupList == null || groupAdapter == null) return;
+
+        ProjectItem targetProjectObject = null;
+
+        // 1. 기존 소속 그룹 리스트에서 해당 프로젝트 객체를 찾아 제거(Remove)합니다.
+        for (GroupItem group : groupList) {
+            String gId = group.getId();
+
+            // 기존 소속 ID가 일치하거나, 기존 소속이 기타인 경우를 안전하게 매칭
+            boolean isOldUnclassified = (oldGroupId == null || "unclassified_dummy_id".equals(oldGroupId) || oldGroupId.isEmpty());
+            boolean isGroupUnclassified = ("unclassified_dummy_id".equals(gId) || "기타".equals(group.getKeyword()));
+
+            if ((isOldUnclassified && isGroupUnclassified) || (!isOldUnclassified && oldGroupId.equals(gId))) {
+                List<ProjectItem> projects = group.getProjects();
+                if (projects != null) {
+                    for (int i = 0; i < projects.size(); i++) {
+                        if (projects.get(i).getId().equals(project.getId())) {
+                            targetProjectObject = projects.remove(i); // 기존 리스트에서 원본 객체를 꺼내며 삭제
+                            break;
+                        }
+                    }
+                }
+            }
+            if (targetProjectObject != null) break;
+        }
+
+        // 혹시 리스트 꼬임으로 원본 객체를 못 찾았을 경우를 대비해 파라미터 객체로 백업
+        if (targetProjectObject == null) {
+            targetProjectObject = project;
+        }
+
+        // 2. 이동하고자 하는 새로운 타겟 그룹을 찾아 프로젝트를 add 함
+        for (GroupItem group : groupList) {
+            String gId = group.getId();
+            boolean isTargetUnclassified = "unclassified_dummy_id".equals(targetGroupId) || "기타".equals(group.getKeyword());
+            boolean isGroupUnclassified = ("unclassified_dummy_id".equals(gId) || "기타".equals(group.getKeyword()));
+
+            if (isTargetUnclassified && isGroupUnclassified) {
+                // 타겟이 '기타' 그룹인 경우
+                if (group.getProjects() == null) group.setProjects(new ArrayList<>());
+                group.getProjects().add(targetProjectObject);
+                break;
+            } else if (targetGroupId != null && targetGroupId.equals(gId)) {
+                // 타겟이 특정 그룹인 경우
+                if (group.getProjects() == null) group.setProjects(new ArrayList<>());
+                group.getProjects().add(targetProjectObject);
+                break;
+            }
+        }
+
+        // 3. 어댑터에 데이터가 통째로 변경되었음을 알려 리사이클러뷰를 즉각 다시 그리게 만듭니다.
+        groupAdapter.notifyDataSetChanged();
     }
 }
