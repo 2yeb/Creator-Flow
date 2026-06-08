@@ -180,16 +180,21 @@ public class VendorSelectBottomSheet extends BottomSheetDialogFragment {
             }
         }
 
-        // 로고 박스: brandColor를 fallback, logoUrl 있으면 Glide로 로드
+        // 로고 박스: logoUrl 있으면 흰 배경 + 로고, 없으면 brandColor 박스
         android.widget.ImageView logo = card.findViewById(R.id.iv_vendor_logo);
         if (logo != null) {
-            logo.setBackgroundTintList(
-                    android.content.res.ColorStateList.valueOf(vendor.brandColor));
             if (vendor.logoUrl != null && !vendor.logoUrl.isEmpty()) {
+                logo.setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(Color.WHITE));
+                logo.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+                logo.setPadding(dp(2), dp(2), dp(2), dp(2));
                 com.bumptech.glide.Glide.with(this)
                         .load(vendor.logoUrl)
+                        .fitCenter()
                         .into(logo);
             } else {
+                logo.setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(vendor.brandColor));
                 logo.setImageDrawable(null);
             }
         }

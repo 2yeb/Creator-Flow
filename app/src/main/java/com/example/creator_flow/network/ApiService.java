@@ -21,7 +21,6 @@ import com.example.creator_flow.UpdateTodoRequest;
 import com.example.creator_flow.CreateTodoRequest;
 import com.example.creator_flow.model.SimulationDetailDto;
 import com.example.creator_flow.model.SimulationResultDto;
-import com.example.creator_flow.model.UpdateProjectRequest;
 import com.example.creator_flow.model.VendorDto;
 import com.example.creator_flow.model.VendorProductDto;
 import com.google.gson.JsonObject;

@@ -594,6 +594,8 @@ public class SimulationDetail1Fragment extends Fragment {
                             vendorNameToId.clear();
                             vendorNameToLogoUrl.clear();
                             for (VendorDto v : resp.body()) {
+                                android.util.Log.d("VendorLogo",
+                                        "API " + v.name + " | logoUrl=" + v.logoUrl);
                                 if (v.name != null && v.id != null) {
                                     vendorNameToId.put(v.name, v.id);
                                     if (v.logoUrl != null && !v.logoUrl.isEmpty()) {
@@ -1066,15 +1068,25 @@ public class SimulationDetail1Fragment extends Fragment {
 
         card.setBackgroundTintList(android.content.res.ColorStateList.valueOf(vendor.cardBgColor));
 
-        // 로고 박스: brandColor를 fallback으로 사용, logoUrl 있으면 Glide로 덮어 그림
+        // 로고 박스: logoUrl 있으면 흰 배경 + 로고, 없으면 brandColor 박스
+        android.util.Log.d("VendorLogo",
+                "card " + vendor.name + " | logoUrl=" + vendor.logoUrl);
         android.widget.ImageView logoBox = card.findViewById(R.id.vendor_color_box);
-        logoBox.setBackgroundTintList(android.content.res.ColorStateList.valueOf(vendor.brandColor));
         if (vendor.logoUrl != null && !vendor.logoUrl.isEmpty()) {
+            // 흰 배경 → 진한 색에 묻히지 않음
+            logoBox.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(Color.WHITE));
+            logoBox.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            logoBox.setPadding(dp(2), dp(2), dp(2), dp(2));
             com.bumptech.glide.Glide.with(this)
                     .load(vendor.logoUrl)
+                    .fitCenter()
                     .into(logoBox);
         } else {
-            logoBox.setImageDrawable(null);  // mock 모드: 이미지 비우고 색 박스만 보임
+            // logoUrl 없음 → brandColor 박스만 (로고 안 들어옴 신호)
+            logoBox.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(vendor.brandColor));
+            logoBox.setImageDrawable(null);
         }
 
         ((TextView) card.findViewById(R.id.tv_vendor_name)).setText(vendor.name);
