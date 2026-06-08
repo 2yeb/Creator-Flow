@@ -69,7 +69,9 @@
                             style="@style/DeliveryOptionText"
                             android:text="우체국 택배" />
 
-                        <TextView style="@style/DeliveryPriceText" />
+                        <TextView
+                            style="@style/DeliveryPriceText"
+                            android:text="4,000원" />
                     </LinearLayout>
 
                     <!-- 편의점 택배 -->
@@ -83,7 +85,9 @@
                             style="@style/DeliveryOptionText"
                             android:text="편의점 택배" />
 
-                        <TextView style="@style/DeliveryPriceText" />
+                        <TextView
+                            style="@style/DeliveryPriceText"
+                            android:text="3,500원" />
                     </LinearLayout>
 
                     <!-- 편의점 반값 택배 -->
@@ -97,7 +101,9 @@
                             style="@style/DeliveryOptionText"
                             android:text="편의점 반값 택배" />
 
-                        <TextView style="@style/DeliveryPriceText" />
+                        <TextView
+                            style="@style/DeliveryPriceText"
+                            android:text="1,900원" />
                     </LinearLayout>
 
                     <!-- 방문 택배 (기사님 호출) -->
@@ -111,7 +117,9 @@
                             style="@style/DeliveryOptionText"
                             android:text="방문 택배 (기사님 호출)" />
 
-                        <TextView style="@style/DeliveryPriceText" />
+                        <TextView
+                            style="@style/DeliveryPriceText"
+                            android:text="5,000원" />
                     </LinearLayout>
 
                     <!-- 준등기 / 우편 -->
@@ -125,7 +133,9 @@
                             style="@style/DeliveryOptionText"
                             android:text="준등기 / 우편" />
 
-                        <TextView style="@style/DeliveryPriceText" />
+                        <TextView
+                            style="@style/DeliveryPriceText"
+                            android:text="1,800원" />
                     </LinearLayout>
 
                 </LinearLayout>
@@ -166,7 +176,7 @@
                             style="@style/DeliveryOptionText"
                             android:text="구매자 부담" />
 
-                        <TextView style="@style/DeliveryPriceText" />
+<!--                        <TextView style="@style/DeliveryPriceText" />-->
                     </LinearLayout>
 
                     <!-- 구매자 부담 금액 입력 (fee_buyer 선택 시 노출) -->
@@ -221,7 +231,7 @@
                             style="@style/DeliveryOptionText"
                             android:text="판매자 택배" />
 
-                        <TextView style="@style/DeliveryPriceText" />
+<!--                        <TextView style="@style/DeliveryPriceText" />-->
                     </LinearLayout>
 
                 </LinearLayout>

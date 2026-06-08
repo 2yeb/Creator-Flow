@@ -288,6 +288,18 @@ public class ProjectPageFragment extends Fragment {
         if (fileList == null || fileList.isEmpty()) return;
         com.example.creator_flow.model.ProjectFile first = fileList.get(0);
 
+        // === 진단 로그 ===
+        com.example.creator_flow.model.SimulationData D = null;  // import 단축용
+        android.util.Log.d("ProjectPage_AutoFill",
+                "vendorName=" + com.example.creator_flow.model.SimulationData.vendorName
+                + " | platformName=" + com.example.creator_flow.model.SimulationData.platformName
+                + " | quantity=" + com.example.creator_flow.model.SimulationData.quantity
+                + " | platformFee=" + com.example.creator_flow.model.SimulationData.platformFee
+                + " | unitCost=" + com.example.creator_flow.model.SimulationData.unitCost
+                + " | lastResult=" + (com.example.creator_flow.model.SimulationData.lastResult == null ? "null" :
+                    "unitCost=" + com.example.creator_flow.model.SimulationData.lastResult.unitCost
+                    + ", recommended=" + com.example.creator_flow.model.SimulationData.lastResult.recommendedPrice));
+
         // SimulationData 값들 (시뮬레이션 단계에서 사용자가 고른 것)
         if (com.example.creator_flow.model.SimulationData.vendorName != null)
             first.setVendorName(com.example.creator_flow.model.SimulationData.vendorName);
@@ -307,16 +319,32 @@ public class ProjectPageFragment extends Fragment {
             if (r.unitCost != null) first.setPrice(r.unitCost);
             if (r.recommendedPrice != null) first.setSellingPrice(r.recommendedPrice);
         }
-        // LOCAL_PROJECT_MODE에서 백엔드 응답 없을 때 fallback —
-        // detail1 vendor 카드에서 클라이언트가 계산한 단가 사용
+        // 단가 fallback — 백엔드 응답 없을 때 detail1 클라이언트 계산값 사용
         if (first.getPrice() == 0
                 && com.example.creator_flow.model.SimulationData.unitCost != null) {
             first.setPrice(com.example.creator_flow.model.SimulationData.unitCost);
         }
 
-        // 한 번 읽었으니 비워서 다음 진입 때 잔존 안 함
-        com.example.creator_flow.model.SimulationData.lastResult = null;
-        com.example.creator_flow.model.SimulationData.unitCost = null;
+        // 판매가 fallback — 백엔드 recommendedPrice 없을 때 클라이언트 계산
+        // 공식: (단가 + 목표순이익/수량) / (1 - 수수료율/100)  ← 백엔드와 동일 식
+        // 사용자가 profit 입력 안 했으면 0 처리 → 최소 손익분기점 가격
+        if (first.getSellingPrice() == 0 && first.getPrice() > 0) {
+            int unitCost = (int) first.getPrice();
+            double feeRate = first.getFeeRate();    // % (예: 8)
+            Integer profit = com.example.creator_flow.model.SimulationData.profit;
+            int qty = first.getQuantity();
+            double netPerUnit = (profit != null && qty > 0)
+                    ? (profit / (double) qty) : 0;
+            double feeFactor = 1.0 - feeRate / 100.0;
+            if (feeFactor > 0) {
+                int recommended = (int) Math.round((unitCost + netPerUnit) / feeFactor);
+                first.setSellingPrice(recommended);
+            }
+        }
+
+        // 한 번 읽었으니 ProjectPage 보관 필드 모두 비움 — 다음 시뮬레이션 진입 시 잔존 방지
+        com.example.creator_flow.model.SimulationData.profit = null;
+        com.example.creator_flow.model.SimulationData.clearPostNavigation();
 
         // 첫 차시로 새로 전환 → EditText들 갱신
         switchChasi(0);
@@ -463,7 +491,7 @@ public class ProjectPageFragment extends Fragment {
         });
 
         // 판매가 입력 감지 → 현재 차시에 저장 + 백엔드 PUT (debounce) + BEP 차트 갱신
-        // (+ 위 profitChartWatcher가 파이차트도 갱신)
+        // 콤마 포함된 입력도 파싱 가능 ("12,800" → 12800)
         etRetailPrice.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
@@ -471,7 +499,7 @@ public class ProjectPageFragment extends Fragment {
             public void afterTextChanged(Editable s) {
                 if (isSwitching) return;
                 try {
-                    String t = s.toString();
+                    String t = s.toString().replaceAll(",", "");   // 콤마 제거 후 파싱
                     fileList.get(selectedIndex).setSellingPrice(t.isEmpty() ? 0 : Integer.parseInt(t));
                     scheduleSaveSimulation(selectedIndex);
                     updateChart();  // BEP 재계산 (판매가 변경)
@@ -691,15 +719,24 @@ public class ProjectPageFragment extends Fragment {
         folderImage.setTag(thumbUri);
 
         // 해당 차시 데이터를 UI에 로드
+        // 큰 숫자(단가/판매가)는 콤마 포맷 (예: 12,800), 수량은 그대로 (작은 숫자)
+        java.text.NumberFormat numFmt = java.text.NumberFormat.getNumberInstance(Locale.KOREA);
         fileName.setText(file.getProjectName() != null ? file.getProjectName() : "");
         calender.setText(file.getDate() != null ? file.getDate() : today());
-        etPrice.setText(file.getPrice() > 0 ? String.valueOf((int) file.getPrice()) : "");
+        etPrice.setText(file.getPrice() > 0 ? numFmt.format((int) file.getPrice()) : "");
         etQuantity.setText(file.getQuantity() > 0 ? String.valueOf(file.getQuantity()) : "");
         etRetailPrice.setText(file.getSellingPrice() > 0
-                ? String.valueOf(file.getSellingPrice()) : "");
+                ? numFmt.format(file.getSellingPrice()) : "");
         etManufacturer.setText(file.getVendorName() != null ? file.getVendorName() : "");
         etSeller.setText(file.getPlatformName() != null ? file.getPlatformName() : "");
-        etCommission.setText(file.getFeeRate() > 0 ? String.valueOf(file.getFeeRate()) : "");
+        // 수수료는 0%여도 표시 (시뮬레이터 통해서 들어오면 0도 정확한 값)
+        // 정수면 "8", 소수면 "5.5" 형식으로 보기 좋게
+        double feeRate = file.getFeeRate();
+        if (feeRate == (int) feeRate) {
+            etCommission.setText(String.valueOf((int) feeRate));
+        } else {
+            etCommission.setText(String.valueOf(feeRate));
+        }
         etSoldQuantity.setText(file.getSoldQuantity() > 0
                 ? String.valueOf(file.getSoldQuantity()) : "");
         etTargetQuantity.setText(file.getTargetQuantity() > 0

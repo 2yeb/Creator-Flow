@@ -144,8 +144,40 @@ public class SimulationPlatformFragment extends Fragment {
 
         rootView = view;
         populateGrid(view);
-        // 시연용 하드코딩 모드 — 백엔드 platforms API 호출 안 함 (PLATFORMS 정적 데이터 사용)
-        // loadPlatformsFromApi();
+        // 화면은 PLATFORMS 하드코딩 유지하되, 백엔드 호출은 살려서 platform_plan_id만 받음.
+        // → goToDelivery()에서 사용자 선택 플랫폼 이름과 매칭 시 plan_id를 SimulationData에 commit.
+        // → POST /simulations 호출이 정상 동작해서 ProjectPage가 백엔드 단가를 받을 수 있음.
+        loadPlatformIdsOnly();
+    }
+
+    /**
+     * 시연용 하드코딩 모드 변종: 백엔드 GET /platforms + plans 호출하지만
+     * 응답으로 화면을 다시 그리지 않고 platformNameToPlanId 매핑만 채움.
+     * (apiPlatforms는 비워둠 → populateGrid는 항상 PLATFORMS 하드코딩 사용)
+     */
+    private void loadPlatformIdsOnly() {
+        if (getContext() == null) return;
+        RetrofitClient.getApi(requireContext()).getPlatforms(null, null)
+                .enqueue(new Callback<List<PlatformDto>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<List<PlatformDto>> call,
+                                           @NonNull Response<List<PlatformDto>> resp) {
+                        if (!isAdded() || !resp.isSuccessful() || resp.body() == null) return;
+                        for (PlatformDto p : resp.body()) {
+                            if (p.name == null || p.id == null) continue;
+                            platformNameToId.put(p.name, p.id);
+                            // 각 플랫폼의 첫 plan_id 받아옴 (화면 갱신 X — apiPlatforms 비워둠)
+                            loadPlatformPlansForId(p.name, p.id);
+                        }
+                        android.util.Log.d("PlatformIds",
+                                "plan_id 매핑 시작 — " + resp.body().size() + " platforms");
+                    }
+                    @Override
+                    public void onFailure(@NonNull Call<List<PlatformDto>> call,
+                                          @NonNull Throwable t) {
+                        android.util.Log.w("PlatformIds", "GET /platforms 실패: " + t.getMessage());
+                    }
+                });
     }
 
     /**
@@ -355,10 +387,20 @@ public class SimulationPlatformFragment extends Fragment {
         if (selectedIndex >= 0 && selectedIndex < source.size()) {
             Platform p = source.get(selectedIndex);
             SimulationData.platformName = p.name;
-            // ✅ POST /simulations에 보낼 plan ID commit (mock 모드/직접입력엔 null)
-            SimulationData.platformPlanId = p.isDirectInput
-                    ? null
-                    : platformNameToPlanId.get(p.name);
+            // ✅ POST /simulations에 보낼 plan ID commit
+            // - 직접 입력: null
+            // - 이름 매칭되면 그 plan_id
+            // - 매칭 실패 시: 백엔드의 첫 plan_id를 fallback (시뮬레이션 계산 보장)
+            String planId = null;
+            if (!p.isDirectInput) {
+                planId = platformNameToPlanId.get(p.name);
+                if (planId == null && !platformNameToPlanId.isEmpty()) {
+                    planId = platformNameToPlanId.values().iterator().next();   // fallback
+                    android.util.Log.d("PlatformApi",
+                            "plan_id 이름 매칭 실패 → fallback 첫 plan_id 사용: " + planId);
+                }
+            }
+            SimulationData.platformPlanId = planId;
             android.util.Log.d("PlatformApi",
                     "goToDelivery 시점 - platformName=" + p.name
                     + ", isDirectInput=" + p.isDirectInput

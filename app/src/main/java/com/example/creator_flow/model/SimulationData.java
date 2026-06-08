@@ -80,23 +80,34 @@ public class SimulationData {
         goodsType = null;
         subType = null;
         optionSummary = null;
-        quantity = null;
-        vendorName = null;
         vendorProductId = null;
         selectedOptionIds = null;
-        platformName = null;
-        platformFee = null;
         platformPlanId = null;
         deliveryMethod = null;
         shippingFeeType = null;
         packagingType = null;
         shippingFeeBuyer = null;
-        profit = null;
         marginRate = null;
-        targetQuantity = null;
         minStock = null;
         estimatedCost = null;
-        // unitCost는 ProjectPage가 읽고 직접 비우므로 reset()에선 유지 (lastResult와 동일 패턴)
+        // ProjectPage가 읽고 직접 비우는 필드들은 보존 (lastResult/unitCost와 동일 패턴):
+        // quantity · vendorName · platformName · platformFee · targetQuantity · profit
+        // · lastResult · unitCost
+        // → ProjectPageFragment.applyLastSimulationResultToFirstChasi() 끝에서 비움.
+    }
+
+    /**
+     * ProjectPage 진입용 보관 필드까지 모두 비움.
+     * ProjectPage가 한 번 읽고 끝에 호출 — 다음 시뮬레이션 시 잔존 방지.
+     */
+    public static void clearPostNavigation() {
+        quantity = null;
+        vendorName = null;
+        platformName = null;
+        platformFee = null;
+        targetQuantity = null;
+        unitCost = null;
+        lastResult = null;
     }
 
     private SimulationData() {}
