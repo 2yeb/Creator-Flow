@@ -103,7 +103,7 @@ public class TodoAdapter extends RecyclerView.Adapter<TodoAdapter.TodoViewHolder
                             actionId == android.view.inputmethod.EditorInfo.IME_ACTION_NEXT ||
                             (event != null && event.getKeyCode() == android.view.KeyEvent.KEYCODE_ENTER)) {
 
-                        // 키보드를 내리고 포커스를 해제하면 위의 OnFocusChange가 알아서 실행됩니다.
+                        // 키보드를 내리고 포커스를 해제하면 OnFocusChange 실행
                         todoEditText.clearFocus();
 
                         InputMethodManager imm = (InputMethodManager) itemView.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);

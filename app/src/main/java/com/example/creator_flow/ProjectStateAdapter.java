@@ -1,6 +1,8 @@
 package com.example.creator_flow;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,39 +18,27 @@ import java.util.List;
 
 public class ProjectStateAdapter extends RecyclerView.Adapter<ProjectStateAdapter.ViewHolder> {
 
-    // 💡 ProjectStateItem을 ProjectList 데이터 모델로 변경
     private List<ProjectItem> items = new ArrayList<>();
     private final OnProjectActionListener actionListener;
+    private final String state; // 프로젝트 상태를 저장할 변수
 
-    // 입력 확정이 되는 클릭 리스너 인터페이스도 ProjectList를 받도록 수정
+    // 클릭 및 수정 인터페이스
     public interface OnProjectActionListener {
         void onProjectClick(ProjectItem item);
-        void onNewProjectConfirmed(ProjectItem item, int position);
+        void onProjectUpdated(ProjectItem item, int position);
     }
 
     // 생성자
-    public ProjectStateAdapter(OnProjectActionListener actionListener) {
+    public ProjectStateAdapter(String state, OnProjectActionListener actionListener) {
+        this.state = state;
         this.actionListener = actionListener;
     }
 
     // 데이터 교체 함수
+    @SuppressLint("NotifyDataSetChanged")
     public void setItems(List<ProjectItem> newItems) {
         this.items = newItems != null ? newItems : new ArrayList<>();
         notifyDataSetChanged();
-    }
-
-    // 아이템 추가 함수
-    public void addItem(ProjectItem item) {
-        this.items.add(item);
-        notifyItemInserted(items.size() - 1);
-    }
-
-    // 아이템 삭제 함수 (외부 위임용 안전한 제거 함수)
-    public void removeItem(int position) {
-        if (position >= 0 && position < items.size()) {
-            items.remove(position);
-            notifyItemRemoved(position);
-        }
     }
 
     @NonNull
@@ -61,7 +51,7 @@ public class ProjectStateAdapter extends RecyclerView.Adapter<ProjectStateAdapte
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         ProjectItem currentItem = items.get(position);
-        holder.bind(currentItem, this, actionListener);
+        holder.bind(currentItem, this, state,  actionListener);
     }
 
     @Override
@@ -82,20 +72,52 @@ public class ProjectStateAdapter extends RecyclerView.Adapter<ProjectStateAdapte
         }
 
         // ProjectList 바인딩 로직
-        public void bind(ProjectItem item, ProjectStateAdapter adapter, OnProjectActionListener listener) {
+        public void bind(ProjectItem item, ProjectStateAdapter adapter, String state, OnProjectActionListener listener) {
 
-            // 새 프로젝트 생성을 위해 임시로 생성된 경우 (id가 비어있음)
-            if (item.getId() == null || item.getId().isEmpty()) {
+            // 기본 상태 설정
+            tvProjectName.setVisibility(View.VISIBLE);
+            editProjectName.setVisibility(View.GONE);
+            tvProjectName.setText(item.getName());
+
+            // 상태에 따른 색상 설정
+            if (state != null) {
+                Context context = itemView.getContext();
+                switch (state) {
+                    case "planning":
+                        btnProjectItem.setCardBackgroundColor(context.getColor(R.color.group_yellow));
+                        break;
+                    case "progressing":
+                        btnProjectItem.setCardBackgroundColor(context.getColor(R.color.group_pink));
+                        break;
+                    case "completed":
+                        btnProjectItem.setCardBackgroundColor(context.getColor(R.color.group_blue));
+                        break;
+                    default:
+                        btnProjectItem.setCardBackgroundColor(context.getColor(R.color.group_yellow));
+                        break;
+                }
+            }
+
+            // 아이템 클릭 시 해당 project_page로 이동
+            btnProjectItem.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onProjectClick(item);
+                }
+            });
+
+            // 아이템을 길게 클릭하면 프로젝트의 이름 변경
+            btnProjectItem.setOnLongClickListener(v -> {
                 tvProjectName.setVisibility(View.INVISIBLE);
                 editProjectName.setVisibility(View.VISIBLE);
                 editProjectName.setText(item.getName());
                 editProjectName.requestFocus();
 
-                // 키보드 자동으로 올리기
                 InputMethodManager imm = (InputMethodManager) itemView.getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (imm != null) {
                     imm.showSoftInput(editProjectName, InputMethodManager.SHOW_IMPLICIT);
                 }
+                return true;
+            });
 
                 // 포커스를 잃었을 때 입력 완료 처리
                 editProjectName.setOnFocusChangeListener((v, hasFocus) -> {
@@ -140,14 +162,21 @@ public class ProjectStateAdapter extends RecyclerView.Adapter<ProjectStateAdapte
             if (currentPosition == RecyclerView.NO_POSITION) return;
 
             if (inputText.isEmpty()) {
-                // 아무것도 입력 안 하고 나갔으면 리스트에서 임시 아이템 삭제
-                adapter.removeItem(currentPosition);
-            } else {
+                // 수정 시 공백으로 두면 기존 이름으로 복구
+                tvProjectName.setVisibility(View.VISIBLE);
+                editProjectName.setVisibility(View.GONE);
+            } else if (!inputText.equals(item.getName())) {
+                // 내용이 변경되었을 때만 서버에 업데이트 요청
                 item.setName(inputText);
+                tvProjectName.setText(inputText);
+                tvProjectName.setVisibility(View.VISIBLE);
+                editProjectName.setVisibility(View.GONE);
                 if (listener != null) {
-                    // 프래그먼트에 알림 (여기서 POST API 연동 수행)
-                    listener.onNewProjectConfirmed(item, currentPosition);
+                    listener.onProjectUpdated(item, currentPosition);
                 }
+            } else {
+                tvProjectName.setVisibility(View.VISIBLE);
+                editProjectName.setVisibility(View.GONE);
             }
         }
     }
