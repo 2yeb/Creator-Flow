@@ -112,7 +112,7 @@ def run_simulation(
     total_fee = total_revenue * (plan.fee_rate / 100)
     total_shipping = vendor_product.shipping_fee
     net_profit = total_revenue - total_cost - total_fee - total_shipping
-    revenue_rate = round((net_profit / total_revenue) * 100, 1)
+    revenue_rate = round((net_profit / total_revenue) * 100, 1) if total_revenue > 0 else 0.0
     recommended_price = round((unit_cost + (net_profit / quantity)) / (1 - plan.fee_rate / 100))
     break_even_quantity = round(total_shipping / (selling_price - unit_cost - (selling_price * plan.fee_rate / 100)))
 
@@ -200,8 +200,9 @@ def get_simulation(simulation_id: str, db: Session = Depends(get_db), user_id: s
     total_revenue = simulation.selling_price * simulation.quantity
     total_fee = total_revenue * (plan.fee_rate / 100)
     net_profit = total_revenue - total_cost - total_fee - vendor_product.shipping_fee
-    revenue_rate = round((net_profit / total_revenue) * 100, 1)
-    break_even_quantity = round(vendor_product.shipping_fee / (simulation.selling_price - unit_cost - (simulation.selling_price * plan.fee_rate / 100)))
+    revenue_rate = round((net_profit / total_revenue) * 100, 1) if total_revenue > 0 else 0.0
+    denominator = simulation.selling_price - unit_cost - (simulation.selling_price * plan.fee_rate / 100)
+    break_even_quantity = round(vendor_product.shipping_fee / denominator) if denominator > 0 else None
 
     return {
         "simulation_id": simulation.id,
@@ -288,6 +289,7 @@ def delete_simulation(simulation_id: str, db: Session = Depends(get_db), user_id
     simulation = db.query(Simulation).filter(Simulation.id == simulation_id).first()
     if not simulation:
         raise HTTPException(status_code=404, detail="시뮬레이션을 찾을 수 없습니다")
+    db.query(SimulationOption).filter(SimulationOption.simulation_id == simulation_id).delete()
     db.delete(simulation)
     db.commit()
     return {"message": "삭제 완료"}

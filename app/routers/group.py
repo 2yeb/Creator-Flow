@@ -32,6 +32,7 @@ def delete_group(group_id: str, db: Session = Depends(get_db), user_id: str = De
     group = db.query(ProjectGroup).filter(ProjectGroup.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="그룹을 찾을 수 없습니다")
+    db.query(ProjectGroupMap).filter(ProjectGroupMap.group_id == group_id).delete()
     db.delete(group)
     db.commit()
     return {"message": "삭제 완료"}
@@ -43,6 +44,14 @@ def tag_group(project_id: str, group_id: str, db: Session = Depends(get_db), use
     db.add(map)
     db.commit()
     return {"message": "태그 완료"}
+
+# 프로젝트 그룹 태그 조회
+@router.get("/projects/{project_id}/groups")
+def get_project_groups(project_id: str, db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
+    maps = db.query(ProjectGroupMap).filter(ProjectGroupMap.project_id == project_id).all()
+    group_ids = [m.group_id for m in maps]
+    groups = db.query(ProjectGroup).filter(ProjectGroup.id.in_(group_ids)).all()
+    return groups
 
 # 프로젝트 그룹 태그 해제
 @router.delete("/projects/{project_id}/groups/{group_id}")

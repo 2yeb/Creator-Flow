@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from app.database import get_db
-from app.models.project import Project
-from app.models.simulation import Simulation
+from app.models.project import Project, ProjectImage, ProjectGroupMap
+from app.models.simulation import Simulation, SimulationOption
 from app.models.crawling import VendorProduct, Vendor, PlatformPlan, PriceByQuantity
 from app.core.security import get_current_user_id
 
@@ -83,6 +83,15 @@ def delete_project(project_id: str, db: Session = Depends(get_db), user_id: str 
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다")
+    
+    simulations = db.query(Simulation).filter(Simulation.project_id == project_id).all()
+    for s in simulations:
+        db.query(SimulationOption).filter(SimulationOption.simulation_id == s.id).delete()
+    db.query(Simulation).filter(Simulation.project_id == project_id).delete()
+    
+    db.query(ProjectGroupMap).filter(ProjectGroupMap.project_id == project_id).delete()
+    db.query(ProjectImage).filter(ProjectImage.project_id == project_id).delete()
+    
     db.delete(project)
     db.commit()
     return {"message": "삭제 완료"}

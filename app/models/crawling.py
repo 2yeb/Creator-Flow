@@ -43,6 +43,7 @@ class VendorProduct(Base):
 class PriceByQuantity(Base):
     __tablename__ = "price_by_quantity"
 
+
     id = Column(CHAR(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     vendor_product_id = Column(CHAR(36), ForeignKey("vendor_product.id"), nullable=False)
     quantity = Column(Integer, nullable=False)
