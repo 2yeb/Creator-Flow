@@ -57,10 +57,11 @@ public class SimulationBusinessFragment extends Fragment {
     /**
      * 시연용 로컬 프로젝트 모드.
      * true면 시뮬레이션 결과만 백엔드에서 받고, 프로젝트 생성/조회 API는 호출 안 함.
-     * ProjectPageFragment를 projectId=null로 띄우고 SimulationData.lastResult 값으로 첫 차시 채움.
-     * 백엔드 프로젝트 API가 불안정할 때 시연을 안전하게 함.
+     * false면 POST /simulations + POST /simulations/{id}/project 둘 다 호출 →
+     * 백엔드에 프로젝트 영구 저장 → ProjectFragment 목록에 카드 추가됨.
+     * (시연 표준 흐름: 시뮬레이션 → ProjectFragment 목록 → 카드 클릭 → ProjectPageFragment)
      */
-    private static final boolean LOCAL_PROJECT_MODE = true;
+    private static final boolean LOCAL_PROJECT_MODE = false;
 
     private boolean isFanart;
 

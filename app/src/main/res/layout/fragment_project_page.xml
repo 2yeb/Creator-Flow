@@ -235,6 +235,14 @@
                     android:clickable="false"
                     android:longClickable="false"
                     android:cursorVisible="false" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="원"
+                    android:textColor="@color/text_color"
+                    android:textSize="13sp"
+                    android:paddingEnd="10dp" />
             </LinearLayout>
 
             <!-- 수량 -->
@@ -262,6 +270,14 @@
                     android:background="@null"
                     android:inputType="number"
                     android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="개"
+                    android:textColor="@color/text_color"
+                    android:textSize="13sp"
+                    android:paddingEnd="10dp" />
             </LinearLayout>
 
             <!-- 판매가 -->
@@ -289,6 +305,14 @@
                     android:background="@null"
                     android:inputType="numberDecimal"
                     android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="원"
+                    android:textColor="@color/text_color"
+                    android:textSize="13sp"
+                    android:paddingEnd="10dp" />
             </LinearLayout>
 
             <!-- 제작 업체 -->
@@ -368,6 +392,14 @@
                     android:background="@null"
                     android:inputType="numberDecimal"
                     android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="%"
+                    android:textColor="@color/text_color"
+                    android:textSize="13sp"
+                    android:paddingEnd="10dp" />
             </LinearLayout>
 
         </LinearLayout>
