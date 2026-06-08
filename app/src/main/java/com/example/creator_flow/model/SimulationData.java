@@ -61,6 +61,19 @@ public class SimulationData {
     // ===== 계산값 (백엔드 또는 클라이언트가 산출) =====
     public static Integer estimatedCost;   // 예상 원가
 
+    /**
+     * 단가 (개당 원). 시뮬레이터 detail1에서 vendor 확정 시 클라이언트가 계산한 값 보관.
+     * LOCAL_PROJECT_MODE에서 백엔드 unit_cost가 없을 때 ProjectPage 첫 차시에 채울 용도.
+     */
+    public static Integer unitCost;
+
+    /**
+     * 시연용 로컬 모드: POST /simulations 응답을 통째로 보관.
+     * ProjectPageFragment 진입 시 첫 차시에 자동 채울 때 사용.
+     * 일반 reset()에서는 비우지 않음 — ProjectPageFragment가 한 번 읽고 직접 null로 비움.
+     */
+    public static com.example.creator_flow.model.SimulationResultDto lastResult;
+
     public static void reset() {
         targetProjectId = null;
         modelType = null;
@@ -83,6 +96,7 @@ public class SimulationData {
         targetQuantity = null;
         minStock = null;
         estimatedCost = null;
+        // unitCost는 ProjectPage가 읽고 직접 비우므로 reset()에선 유지 (lastResult와 동일 패턴)
     }
 
     private SimulationData() {}

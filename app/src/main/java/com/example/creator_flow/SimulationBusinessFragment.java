@@ -54,6 +54,14 @@ public class SimulationBusinessFragment extends Fragment {
      */
     private static final boolean DEMO_SKIP_PROJECT_LIST = false;
 
+    /**
+     * 시연용 로컬 프로젝트 모드.
+     * true면 시뮬레이션 결과만 백엔드에서 받고, 프로젝트 생성/조회 API는 호출 안 함.
+     * ProjectPageFragment를 projectId=null로 띄우고 SimulationData.lastResult 값으로 첫 차시 채움.
+     * 백엔드 프로젝트 API가 불안정할 때 시연을 안전하게 함.
+     */
+    private static final boolean LOCAL_PROJECT_MODE = true;
+
     private boolean isFanart;
 
     public SimulationBusinessFragment() {}
@@ -228,8 +236,18 @@ public class SimulationBusinessFragment extends Fragment {
                 }
                 SimulationResultDto r = resp.body();
                 SimulationData.estimatedCost = r.totalCost;
+                // 시연용 로컬 모드: 결과를 보관 → ProjectPageFragment 첫 차시 자동 채움용
+                SimulationData.lastResult = r;
                 android.util.Log.d("SimulationConfirm",
                         "✅ 시뮬레이션 OK: simulation_id=" + r.simulationId);
+
+                if (LOCAL_PROJECT_MODE) {
+                    // 시연용 로컬 모드 — 백엔드 프로젝트 API 호출 스킵
+                    android.util.Log.d("SimulationConfirm",
+                            "🔄 LOCAL_PROJECT_MODE — 프로젝트 생성 API 스킵, ProjectPageFragment(null)로 이동");
+                    finishAndNavigate(null);
+                    return;
+                }
 
                 if (capturedTargetProjectId != null) {
                     // Flow B: 기존 프로젝트에 차시 attach 완료 — 그 프로젝트로 이동
@@ -298,7 +316,10 @@ public class SimulationBusinessFragment extends Fragment {
             fm.executePendingTransactions();
 
             androidx.fragment.app.Fragment dest;
-            if (DEMO_SKIP_PROJECT_LIST) {
+            if (LOCAL_PROJECT_MODE) {
+                // 시연용 로컬 모드 — projectId 무시하고 항상 ProjectPageFragment(null) (메모리만)
+                dest = new ProjectPageFragment();
+            } else if (DEMO_SKIP_PROJECT_LIST) {
                 // 시현 모드 — 항상 ProjectPageFragment로 (projectId 없으면 fallback)
                 dest = (projectId != null)
                         ? ProjectPageFragment.newInstance(projectId)
