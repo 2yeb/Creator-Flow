@@ -47,7 +47,16 @@ import androidx.core.content.FileProvider;
 import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.fragment.app.Fragment;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.load.model.GlideUrl;
+import com.bumptech.glide.load.model.LazyHeaders;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 import com.example.creator_flow.model.ImageUploadResponse;
+import com.example.creator_flow.network.NetworkConfig;
+import com.example.creator_flow.network.TokenManager;
 import com.example.creator_flow.model.ProjectFile;
 import com.example.creator_flow.model.ProjectImageDto;
 import com.example.creator_flow.model.ProjectResponse;
@@ -84,6 +93,23 @@ import java.util.Locale;
  * - 선택된 차시에 따라 폴더 UI 색상이 노랑/파랑/보라 순으로 순환된다.
  */
 public class ProjectPageFragment extends Fragment {
+
+    /**
+     * plan_name → platform_name 매핑.
+     * GET /projects/{id} 응답 simulations[]엔 platform_plan(plan_name)만 있고
+     * platform_name이 없어서, 백엔드 plans 응답으로 미리 확인한 매핑을 정적으로 보유.
+     * (plans 응답에 platform_id가 있어 정확한 매핑 확인됨 — 2026-06-08 검증)
+     */
+    private static final java.util.Map<String, String> PLAN_TO_PLATFORM_NAME =
+            new java.util.HashMap<String, String>() {{
+                put("직접 입력", "직접 입력");
+                put("무통장",     "개인폼(무통장)");
+                put("기본",       "네이버 스마트스토어");
+                put("파도플랜",   "TMM");
+                put("Start",      "텀블벅");
+                put("슬림폼",     "윗치폼");
+                put("페이폼",     "윗치폼");
+            }};
 
     /** 서버 프로젝트 ID — newInstance()로 전달받거나 목록에서 선택 시 설정 */
     private String projectId;
@@ -761,6 +787,7 @@ public class ProjectPageFragment extends Fragment {
         isSwitching = false;
         updateSalesProgress(); // 프로그레스바 갱신 (per-차시)
         updateProfitChart();   // 수익 구조 파이차트 갱신 (per-차시)
+        updateChart();         // 차시별 단가 + BEP 라인차트 갱신
         refreshTabs();         // 탭 UI 갱신
     }
 
@@ -873,13 +900,31 @@ public class ProjectPageFragment extends Fragment {
                                 // 2026-06 백엔드 업데이트로 응답에 모든 필드 포함됨
                                 // (별도 GET /simulations 호출 불필요)
                                 if (s.quantity != null) file.setQuantity(s.quantity);
-                                if (s.sellingPrice != null) file.setSellingPrice(s.sellingPrice);
                                 if (s.targetQuantity != null) file.setTargetQuantity(s.targetQuantity);
                                 if (s.actualQuantity != null) file.setSoldQuantity(s.actualQuantity);
                                 if (s.unitCost != null) file.setPrice(s.unitCost);
                                 if (s.vendorName != null) file.setVendorName(s.vendorName);
-                                if (s.platformPlan != null) file.setPlatformName(s.platformPlan);
                                 if (s.feeRate != null) file.setFeeRate(s.feeRate);
+
+                                // 판매가: 백엔드 selling_price가 0이면 클라이언트 fallback 계산
+                                // 공식: 단가 / (1 - 수수료율/100)
+                                if (s.sellingPrice != null && s.sellingPrice > 0) {
+                                    file.setSellingPrice(s.sellingPrice);
+                                } else if (s.unitCost != null && s.unitCost > 0) {
+                                    double feeRate = s.feeRate != null ? s.feeRate : 0;
+                                    double feeFactor = 1.0 - feeRate / 100.0;
+                                    if (feeFactor > 0) {
+                                        file.setSellingPrice(
+                                                (int) Math.round(s.unitCost / feeFactor));
+                                    }
+                                }
+
+                                // platform_plan(plan_name) → platform_name 매핑 (매핑 없으면 plan_name 그대로)
+                                if (s.platformPlan != null) {
+                                    String platformName = PLAN_TO_PLATFORM_NAME.getOrDefault(
+                                            s.platformPlan, s.platformPlan);
+                                    file.setPlatformName(platformName);
+                                }
                                 fileList.add(file);
                             }
                         }
@@ -979,7 +1024,10 @@ public class ProjectPageFragment extends Fragment {
             // 차시당 최대 2개까지만 (refreshPhotoBox의 UI 제약과 일치)
             if (target.getPhotoUris().size() >= 2) continue;
 
-            target.getPhotoUris().add(Uri.parse(img.imageUrl));
+            String absUrl = toAbsoluteImageUrl(img.imageUrl);
+            android.util.Log.d("ProjectPage",
+                    "image[" + img.id + "] raw=" + img.imageUrl + " → abs=" + absUrl);
+            target.getPhotoUris().add(Uri.parse(absUrl));
             target.getPhotoImageIds().add(img.id);
         }
 
@@ -991,6 +1039,26 @@ public class ProjectPageFragment extends Fragment {
             photoList.addAll(current.getPhotoUris());
             photoImageIds.addAll(current.getPhotoImageIds());
             refreshPhotoBox();
+        }
+    }
+
+    /**
+     * 백엔드 imageUrl을 절대 URL로 변환.
+     * - "https://..." / "http://..." → 그대로
+     * - "/uploads/abc.png" → BASE_URL 뒤에 결합 (이중 슬래시 방지)
+     * - "uploads/abc.png" → BASE_URL + "/" + path
+     */
+    private static String toAbsoluteImageUrl(String raw) {
+        if (raw == null) return null;
+        String s = raw.trim();
+        if (s.startsWith("http://") || s.startsWith("https://")) return s;
+        String base = com.example.creator_flow.network.NetworkConfig.BASE_URL;
+        if (base.endsWith("/") && s.startsWith("/")) {
+            return base + s.substring(1);
+        } else if (!base.endsWith("/") && !s.startsWith("/")) {
+            return base + "/" + s;
+        } else {
+            return base + s;
         }
     }
 
@@ -1207,6 +1275,9 @@ public class ProjectPageFragment extends Fragment {
         chartUnitPrice.setDrawGridBackground(false);
         chartUnitPrice.setBackgroundColor(Color.TRANSPARENT);
 
+        // 차트 외곽 여백 — 축 라벨이 카드 경계에 묻히지 않게
+        chartUnitPrice.setExtraOffsets(12f, 12f, 12f, 12f);
+
         // X축
         XAxis xAxis = chartUnitPrice.getXAxis();
         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
@@ -1214,6 +1285,7 @@ public class ProjectPageFragment extends Fragment {
         xAxis.setTextColor(0xFF888888);
         xAxis.setTextSize(11f);
         xAxis.setGranularity(1f);
+        xAxis.setYOffset(8f);   // 차트 ↔ X축 라벨 사이 여백
 
         // 왼쪽 Y축 — 단가 (₩)
         YAxis leftAxis = chartUnitPrice.getAxisLeft();
@@ -1222,6 +1294,7 @@ public class ProjectPageFragment extends Fragment {
         leftAxis.setTextColor(COLOR_PRICE);
         leftAxis.setTextSize(11f);
         leftAxis.setAxisMinimum(0f);
+        leftAxis.setXOffset(8f);   // 차트 ↔ Y축 라벨 사이 여백
 
         // 오른쪽 Y축 — 손익분기점 (개)
         YAxis rightAxis = chartUnitPrice.getAxisRight();
@@ -1230,6 +1303,7 @@ public class ProjectPageFragment extends Fragment {
         rightAxis.setTextColor(COLOR_BEP);
         rightAxis.setTextSize(11f);
         rightAxis.setAxisMinimum(0f);
+        rightAxis.setXOffset(8f);   // 차트 ↔ Y축 라벨 사이 여백
 
         updateChart();
     }
@@ -1278,6 +1352,10 @@ public class ProjectPageFragment extends Fragment {
 
         chartUnitPrice.getXAxis().setValueFormatter(new IndexAxisValueFormatter(labels));
         chartUnitPrice.getXAxis().setLabelCount(fileList.size());
+
+        // X축 양쪽 여백 — 첫/마지막 점이 Y축(차트 좌·우 경계)에 닿지 않게
+        chartUnitPrice.getXAxis().setAxisMinimum(-0.35f);
+        chartUnitPrice.getXAxis().setAxisMaximum(Math.max(fileList.size() - 1 + 0.35f, 0.7f));
 
         if (priceEntries.isEmpty() && bepEntries.isEmpty()) {
             chartUnitPrice.clear();
@@ -1449,12 +1527,15 @@ public class ProjectPageFragment extends Fragment {
         chartProfitStructure.setCenterTextSize(13f);
         chartProfitStructure.setCenterTextColor(0xFF444444);
         chartProfitStructure.setDescription(null);
-        chartProfitStructure.setDrawEntryLabels(false); // 슬라이스 위 이름 라벨 숨김
+        // 슬라이스 위에 항목 이름 표시 ("단가" / "순이익" 등)
+        chartProfitStructure.setDrawEntryLabels(true);
+        chartProfitStructure.setEntryLabelColor(0xFF313131);
+        chartProfitStructure.setEntryLabelTextSize(10f);
         chartProfitStructure.setRotationEnabled(false);
         chartProfitStructure.setTouchEnabled(false);
-        chartProfitStructure.getLegend().setEnabled(true);
-        chartProfitStructure.getLegend().setTextColor(0xFF444444);
-        chartProfitStructure.getLegend().setTextSize(11f);
+        // 범례 비활성화 — 슬라이스 자체에 라벨이 있으니 중복 표시 방지
+        // (이전엔 0인 슬라이스는 그려지지 않는데 범례는 남아 보이는 어색함이 있었음)
+        chartProfitStructure.getLegend().setEnabled(false);
         chartProfitStructure.setVisibility(View.VISIBLE);
         chartProfitStructure.invalidate();
     }
@@ -1480,8 +1561,12 @@ public class ProjectPageFragment extends Fragment {
     }
 
     /** 문자열을 float으로 변환한다. 빈 문자열이나 파싱 실패 시 0을 반환한다. */
+    /** 콤마 포맷("3,828") 텍스트도 파싱 가능. 빈/실패 시 0 반환. */
     private float parseFloat(String s) {
-        try { return s == null || s.isEmpty() ? 0f : Float.parseFloat(s); }
+        if (s == null) return 0f;
+        String clean = s.replaceAll(",", "").trim();
+        if (clean.isEmpty()) return 0f;
+        try { return Float.parseFloat(clean); }
         catch (NumberFormatException e) { return 0f; }
     }
 
@@ -1535,7 +1620,47 @@ public class ProjectPageFragment extends Fragment {
             photoView.setBackground(ContextCompat.getDrawable(
                     requireContext(), R.drawable.project_rounded_solid));
             photoView.setClipToOutline(true);
-            photoView.setImageURI(photoList.get(i));
+            // setImageURI는 content://, file:// 만 지원 — HTTPS URL은 Glide로 로드해야 함
+            // 백엔드 URL(ngrok)은 인증 토큰 + ngrok-skip-browser-warning 헤더 없으면
+            // HTML 경고 페이지 반환되어 이미지 디코드 실패 → 흰 박스로 보임.
+            // 그래서 https/http는 GlideUrl + LazyHeaders로 헤더 첨부, content://·file://는 그대로.
+            Uri photoUri = photoList.get(i);
+            Object loadTarget = photoUri;
+            String scheme = photoUri.getScheme();
+            if (scheme != null && (scheme.equals("https") || scheme.equals("http"))) {
+                String token = TokenManager.getInstance(requireContext()).getToken();
+                if (token == null) token = NetworkConfig.DEV_TOKEN;
+                LazyHeaders.Builder headers = new LazyHeaders.Builder()
+                        .addHeader("ngrok-skip-browser-warning", "true");
+                if (token != null && !token.isEmpty()) {
+                    headers.addHeader("Authorization", "Bearer " + token);
+                }
+                loadTarget = new GlideUrl(photoUri.toString(), headers.build());
+            }
+            final Object finalLoadTarget = loadTarget;
+            Glide.with(requireContext())
+                    .load(loadTarget)
+                    .centerCrop()
+                    .listener(new RequestListener<Drawable>() {
+                        @Override
+                        public boolean onLoadFailed(@androidx.annotation.Nullable GlideException e,
+                                                    Object model, Target<Drawable> target,
+                                                    boolean isFirstResource) {
+                            android.util.Log.e("PhotoLoad",
+                                    "FAILED model=" + finalLoadTarget + ", err=" + e);
+                            if (e != null) e.logRootCauses("PhotoLoad");
+                            return false;  // 기본 처리(error placeholder 등) 그대로
+                        }
+                        @Override
+                        public boolean onResourceReady(Drawable resource, Object model,
+                                                       Target<Drawable> target, DataSource dataSource,
+                                                       boolean isFirstResource) {
+                            android.util.Log.d("PhotoLoad", "OK model=" + finalLoadTarget
+                                    + ", source=" + dataSource);
+                            return false;
+                        }
+                    })
+                    .into(photoView);
 
             final int index = i;
             photoView.setOnClickListener(v -> {

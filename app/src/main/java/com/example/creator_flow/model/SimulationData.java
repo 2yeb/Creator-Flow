@@ -41,7 +41,7 @@ public class SimulationData {
 
     // ===== Platform =====
     public static String platformName;     // 판매 업체 (윗치폼/텀블벅 등) — 표시용
-    public static Integer platformFee;     // 수수료(%) — Business일 때만 의미 있음
+    public static Double platformFee;      // 수수료(%) — 소수점 유지 (예: 4.68)
     /** POST /simulations 에 사용할 platform_plan의 실제 UUID. mock 모드에선 null */
     public static String platformPlanId;
 

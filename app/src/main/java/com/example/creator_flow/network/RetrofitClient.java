@@ -29,13 +29,16 @@ public class RetrofitClient {
                         String token = tokenManager.getToken();
                         if (token == null) token = NetworkConfig.DEV_TOKEN;
 
-                        Request request = (token != null && !token.isEmpty())
-                                ? original.newBuilder()
-                                    .header("Authorization", "Bearer " + token)
-                                    .build()
-                                : original;
+                        // ngrok 무료 플랜의 "브라우저 경고 페이지" 우회 — 모든 요청에 자동 첨부.
+                        // 없으면 ngrok이 HTML 경고 페이지 반환해서 JSON 파싱 실패.
+                        Request.Builder builder = original.newBuilder()
+                                .header("ngrok-skip-browser-warning", "true");
 
-                        return chain.proceed(request);
+                        if (token != null && !token.isEmpty()) {
+                            builder.header("Authorization", "Bearer " + token);
+                        }
+
+                        return chain.proceed(builder.build());
                     })
                     .addInterceptor(new HttpLoggingInterceptor()
                             .setLevel(HttpLoggingInterceptor.Level.BODY))

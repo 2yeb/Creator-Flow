@@ -109,6 +109,23 @@ public class ProjectStateAdapter extends RecyclerView.Adapter<ProjectStateAdapte
                 editProjectName.setVisibility(View.INVISIBLE);
                 tvProjectName.setText(item.getName());
 
+                // status별 카드 배경 색 (디자인 사양 — 기획 노랑 / 진행 분홍 / 완료 보라)
+                int bgColor = 0xFFFFE08A;   // 기본: 기획 노랑
+                if (item.getStatus() != null) {
+                    switch (item.getStatus().toLowerCase()) {
+                        case "progressing":
+                            bgColor = 0xFFF5C2C7;   // 분홍 (진행)
+                            break;
+                        case "completed":
+                            bgColor = 0xFFC4C4F5;   // 보라 (완료)
+                            break;
+                        default:
+                            bgColor = 0xFFFFE08A;   // planning · active 등 → 노랑
+                            break;
+                    }
+                }
+                btnProjectItem.setCardBackgroundColor(bgColor);
+
                 itemView.setOnClickListener(v -> {
                     if (listener != null) {
                         listener.onProjectClick(item);

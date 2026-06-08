@@ -1068,12 +1068,13 @@ public class SimulationDetail1Fragment extends Fragment {
 
         card.setBackgroundTintList(android.content.res.ColorStateList.valueOf(vendor.cardBgColor));
 
-        // 로고 박스: logoUrl 있으면 흰 배경 + 로고, 없으면 brandColor 박스
-        android.util.Log.d("VendorLogo",
-                "card " + vendor.name + " | logoUrl=" + vendor.logoUrl);
+        // 로고 박스: PNG/JPG/WebP만 Glide로 로드. SVG/빈값은 brandColor 박스.
+        // (Glide는 기본적으로 SVG 디코딩 미지원 → 별도 라이브러리 추가 전엔 색 박스로 fallback)
         android.widget.ImageView logoBox = card.findViewById(R.id.vendor_color_box);
-        if (vendor.logoUrl != null && !vendor.logoUrl.isEmpty()) {
-            // 흰 배경 → 진한 색에 묻히지 않음
+        boolean hasRasterLogo = vendor.logoUrl != null
+                && !vendor.logoUrl.isEmpty()
+                && !vendor.logoUrl.toLowerCase().endsWith(".svg");
+        if (hasRasterLogo) {
             logoBox.setBackgroundTintList(
                     android.content.res.ColorStateList.valueOf(Color.WHITE));
             logoBox.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
@@ -1083,7 +1084,7 @@ public class SimulationDetail1Fragment extends Fragment {
                     .fitCenter()
                     .into(logoBox);
         } else {
-            // logoUrl 없음 → brandColor 박스만 (로고 안 들어옴 신호)
+            // SVG 또는 빈 URL → brandColor 박스
             logoBox.setBackgroundTintList(
                     android.content.res.ColorStateList.valueOf(vendor.brandColor));
             logoBox.setImageDrawable(null);

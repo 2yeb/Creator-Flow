@@ -180,10 +180,13 @@ public class VendorSelectBottomSheet extends BottomSheetDialogFragment {
             }
         }
 
-        // 로고 박스: logoUrl 있으면 흰 배경 + 로고, 없으면 brandColor 박스
+        // 로고 박스: PNG/JPG/WebP만 Glide로 로드. SVG/빈값은 brandColor 박스로 fallback.
         android.widget.ImageView logo = card.findViewById(R.id.iv_vendor_logo);
         if (logo != null) {
-            if (vendor.logoUrl != null && !vendor.logoUrl.isEmpty()) {
+            boolean hasRasterLogo = vendor.logoUrl != null
+                    && !vendor.logoUrl.isEmpty()
+                    && !vendor.logoUrl.toLowerCase().endsWith(".svg");
+            if (hasRasterLogo) {
                 logo.setBackgroundTintList(
                         android.content.res.ColorStateList.valueOf(Color.WHITE));
                 logo.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);

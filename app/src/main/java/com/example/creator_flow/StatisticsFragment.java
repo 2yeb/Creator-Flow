@@ -144,6 +144,11 @@ public class StatisticsFragment extends Fragment {
                                 case "completed":
                                     completedList.add(project);
                                     break;
+                                default:
+                                    // 백엔드 status "active" 등 매핑 안 된 값은 "기획" 컬럼으로
+                                    // (백엔드가 status 표준화하기 전까지의 임시 처리)
+                                    planningList.add(project);
+                                    break;
                             }
                         }
                     }

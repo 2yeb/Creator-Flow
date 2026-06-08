@@ -206,7 +206,7 @@
 
             <!-- 단가 -->
             <LinearLayout
-                android:layout_width="180dp"
+                android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginBottom="8dp"
                 android:background="@drawable/project_section_field"
@@ -224,9 +224,9 @@
                 <!-- 단가는 시뮬레이터에서 자동 계산되어 들어오는 값이라 사용자 입력 차단 (read-only) -->
                 <EditText
                     android:id="@+id/et_price"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:minWidth="40dp"
                     android:background="@null"
                     android:inputType="none"
                     android:textSize="14sp"
@@ -247,7 +247,7 @@
 
             <!-- 수량 -->
             <LinearLayout
-                android:layout_width="180dp"
+                android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginBottom="8dp"
                 android:background="@drawable/project_section_field"
@@ -264,9 +264,9 @@
 
                 <EditText
                     android:id="@+id/et_quantity"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:minWidth="30dp"
                     android:background="@null"
                     android:inputType="number"
                     android:textSize="14sp" />
@@ -282,7 +282,7 @@
 
             <!-- 판매가 -->
             <LinearLayout
-                android:layout_width="180dp"
+                android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginBottom="8dp"
                 android:background="@drawable/project_section_field"
@@ -299,9 +299,9 @@
 
                 <EditText
                     android:id="@+id/et_retail_price"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:minWidth="40dp"
                     android:background="@null"
                     android:inputType="numberDecimal"
                     android:textSize="14sp" />
@@ -317,13 +317,14 @@
 
             <!-- 제작 업체 -->
             <LinearLayout
-                android:layout_width="180dp"
+                android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginBottom="8dp"
                 android:background="@drawable/project_section_field"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="12dp">
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -334,22 +335,26 @@
 
                 <EditText
                     android:id="@+id/et_manufacturer"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:minWidth="60dp"
                     android:background="@null"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:inputType="text" />
             </LinearLayout>
 
             <!-- 판매 업체 -->
             <LinearLayout
-                android:layout_width="180dp"
+                android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginBottom="8dp"
                 android:background="@drawable/project_section_field"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="12dp">
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -360,16 +365,19 @@
 
                 <EditText
                     android:id="@+id/et_seller"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:minWidth="60dp"
                     android:background="@null"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:inputType="text" />
             </LinearLayout>
 
             <!-- 판매 수수료 -->
             <LinearLayout
-                android:layout_width="180dp"
+                android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginBottom="8dp"
                 android:background="@drawable/project_section_field"
@@ -386,9 +394,9 @@
 
                 <EditText
                     android:id="@+id/et_commission"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:minWidth="40dp"
                     android:background="@null"
                     android:inputType="numberDecimal"
                     android:textSize="14sp" />
