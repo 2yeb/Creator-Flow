@@ -84,16 +84,21 @@
         <item name="android:layout_marginBottom">15dp</item>
     </style>
 
-    <!-- 포장재 칩 (택배 행과 같은 라운딩, 폭은 wrap) -->
+    <!-- 포장재 칩 (택배 행과 같은 라운딩, 폭은 wrap)
+         singleLine + maxLines 강제 — 긴 텍스트도 한 줄로 표시되어 칩 너비가 자연스럽게 확장됨.
+         (예전엔 텍스트 길면 줄바꿈으로 칩 모양 깨짐) -->
     <style name="PackagingChip">
         <item name="android:layout_width">wrap_content</item>
-        <item name="android:layout_height">30dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">30dp</item>
         <item name="android:gravity">center</item>
         <item name="android:background">@drawable/packaging_chip_bg</item>
         <item name="android:paddingStart">15dp</item>
         <item name="android:paddingEnd">15dp</item>
         <item name="android:textColor">@color/text_color</item>
         <item name="android:textSize">14sp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:maxLines">1</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
     </style>

@@ -55,7 +55,7 @@ public class SimulationDetail1Fragment extends Fragment {
     public static final String MODEL_FANART = "Fanart";
 
     private static final String CUSTOM_GOODS_TYPE = "직접입력";
-    private static final int[] HAPTIC_POINTS = {10, 30, 50, 100, 150, 200, 250, 300};
+    private static final int[] HAPTIC_POINTS = {10, 30, 50, 100, 150, 200};
 
     /** 굿즈 유형 → 세부 유형 목록 */
     private static final Map<String, List<String>> GOODS_TYPE_TO_SUBTYPES = new LinkedHashMap<>();
@@ -450,6 +450,13 @@ public class SimulationDetail1Fragment extends Fragment {
             }
         }
 
+        // 단가 commit — 선택된 vendor의 옵션 extra_price 합산값을 SimulationData에 저장.
+        // LOCAL_PROJECT_MODE에서 백엔드 unit_cost를 못 받을 때 ProjectPage 첫 차시 단가로 자동 채움됨.
+        if (confirmedVendorKey != null) {
+            int unitCost = calculateVendorUnitCost(confirmedVendorKey);
+            if (unitCost > 0) SimulationData.unitCost = unitCost;
+        }
+
         getParentFragmentManager().beginTransaction()
                 .replace(R.id.main_fragment, SimulationPlatformFragment.newInstance(currentModelType))
                 .addToBackStack(null)
@@ -811,6 +818,22 @@ public class SimulationDetail1Fragment extends Fragment {
         }
     }
 
+    /**
+     * 옵션 → 값 → extra_price 맵 생성 (바텀시트로 넘김).
+     * 바텀시트에서 칩 변경 시 단가 재계산용.
+     */
+    private Map<String, Map<String, Integer>> buildOptionPriceMap(List<ProductOptionDto> opts) {
+        Map<String, Map<String, Integer>> map = new HashMap<>();
+        if (opts == null) return map;
+        for (ProductOptionDto opt : opts) {
+            if (opt.optionName == null || opt.optionValue == null) continue;
+            int price = opt.extraPrice != null ? opt.extraPrice : 0;
+            map.computeIfAbsent(opt.optionName, k -> new HashMap<>())
+                    .put(opt.optionValue, price);
+        }
+        return map;
+    }
+
     /** 현재 수량 — EditText 값이 신뢰 가능한 출처 (SimulationData.quantity는 "다음" 누른 후에만 갱신됨) */
     private int getCurrentQuantity() {
         View root = getView();
@@ -855,8 +878,9 @@ public class SimulationDetail1Fragment extends Fragment {
             // 단가 = 선택된 옵션들의 extra_price 합산.
              // 카드에는 총가격(단가 × 수량) 표시 — 사용자의 vendor 비교 직관에 맞춤.
              // 옵션이 다 안 들어왔을 때는 0 (자동 fallback).
+             int currentQty = getCurrentQuantity();
              int unitCost = calculateVendorUnitCost(name);
-             int totalCost = unitCost * getCurrentQuantity();
+             int totalCost = unitCost * currentQty;
 
              VendorInfo info = new VendorInfo(
                     name,
@@ -868,6 +892,10 @@ public class SimulationDetail1Fragment extends Fragment {
                     capabilities
             );
             info.logoUrl = vendorNameToLogoUrl.get(name);  // 백엔드에서 받은 로고 URL
+            info.productName = vp.name;                    // 상품명 (2026-06-06 백엔드 추가)
+            info.quantity = currentQty;
+            // 옵션별 extra_price 맵 — 바텀시트에서 칩 변경 시 가격 재계산용
+            info.optionPrices = buildOptionPriceMap(opts);
             apiVendors.add(info);
         }
         View root = getView();
@@ -1050,6 +1078,16 @@ public class SimulationDetail1Fragment extends Fragment {
         }
 
         ((TextView) card.findViewById(R.id.tv_vendor_name)).setText(vendor.name);
+
+        // 상품명 (백엔드 VendorProduct.name) — 값 있을 때만 표시
+        TextView tvProduct = card.findViewById(R.id.tv_vendor_product);
+        if (vendor.productName != null && !vendor.productName.isEmpty()) {
+            tvProduct.setText(vendor.productName);
+            tvProduct.setVisibility(View.VISIBLE);
+        } else {
+            tvProduct.setVisibility(View.GONE);
+        }
+
         ((TextView) card.findViewById(R.id.tv_vendor_price)).setText(formatPrice(vendor.basePrice));
 
         StringBuilder spec = new StringBuilder();
@@ -1091,11 +1129,18 @@ public class SimulationDetail1Fragment extends Fragment {
                 etValue.setText(String.valueOf(progress));
                 syncing[0] = false;
                 int prev = lastProgress[0];
+                // 큰 마디 — 강한 햅틱 (10, 30, 50, 100, 150, 200 지나갈 때)
+                boolean bigTick = false;
                 for (int point : HAPTIC_POINTS) {
                     if ((prev < point && progress >= point) || (prev > point && progress <= point)) {
                         sb.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                        bigTick = true;
                         break;
                     }
+                }
+                // 5단위 마디 — 약한 햅틱 (큰 마디에서 이미 진동했으면 skip)
+                if (!bigTick && prev / 5 != progress / 5) {
+                    sb.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
                 }
                 lastProgress[0] = progress;
                 // 수량 바뀌면 vendor 카드 총가격 갱신 (단가 × 수량) — API 모드도 함께 처리

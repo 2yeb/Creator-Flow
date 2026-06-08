@@ -221,6 +221,7 @@
                     android:textColor="@color/text_color"
                     android:textSize="14sp" />
 
+                <!-- 단가는 시뮬레이터에서 자동 계산되어 들어오는 값이라 사용자 입력 차단 (read-only) -->
                 <EditText
                     android:id="@+id/et_price"
                     android:layout_width="0dp"
@@ -444,17 +445,17 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- 차수별 단가 라벨 -->
+        <!-- 차시별 그래프 라벨 -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="26dp"
             android:layout_marginBottom="6dp"
-            android:text="차수별 단가"
+            android:text="차시별 그래프"
             android:textColor="@color/text_color"
             android:textSize="14sp" />
 
-        <!-- 차수별 단가 카드 -->
+        <!-- 차시별 그래프 카드 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

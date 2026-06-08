@@ -37,6 +37,17 @@
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- 상품명 (vendor 이름 밑) — 백엔드 VendorProduct.name -->
+    <TextView
+        android:id="@+id/tv_vendor_product"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:textColor="#7A7A7A"
+        android:textSize="10sp"
+        android:singleLine="true"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/tv_vendor_price"
         android:layout_width="wrap_content"

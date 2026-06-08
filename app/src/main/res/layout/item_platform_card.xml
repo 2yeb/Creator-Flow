@@ -10,12 +10,22 @@
     android:focusable="true"
     android:padding="10dp">
 
-    <!-- 로고 박스 (흰색) -->
+    <!-- 로고 박스 (흰색) — logoResId 있으면 ImageView, 없으면 TextView fallback -->
     <FrameLayout
         android:layout_width="60dp"
         android:layout_height="60dp"
         android:layout_marginTop="4dp"
         android:background="@drawable/platform_logo_box">
+
+        <ImageView
+            android:id="@+id/iv_logo"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:padding="6dp"
+            android:scaleType="centerInside"
+            android:contentDescription="플랫폼 로고"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/tv_logo_letter"
@@ -66,8 +76,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:hint="0"
-                android:textColorHint="@color/text_color"
-                android:textColor="@color/text_color"
+                android:textColorHint="#9A9A9A"
+                android:textColor="#9A9A9A"
                 android:textSize="13sp"
                 android:inputType="number"
                 android:maxLength="3"
@@ -81,7 +91,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="%"
-                android:textColor="@color/text_color"
+                android:textColor="#9A9A9A"
                 android:textSize="13sp" />
         </LinearLayout>
     </FrameLayout>

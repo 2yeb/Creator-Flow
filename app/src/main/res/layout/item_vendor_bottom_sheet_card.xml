@@ -46,14 +46,31 @@
                 android:scaleType="centerInside"
                 android:contentDescription="업체 로고" />
 
-            <TextView
-                android:id="@+id/tv_vendor_name"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="업체"
-                android:textColor="@color/text_color"
-                android:textSize="15sp"
-                android:textStyle="bold" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_vendor_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="업체"
+                    android:textColor="@color/text_color"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <!-- 상품명 (vendor 이름 밑) — 백엔드 VendorProduct.name -->
+                <TextView
+                    android:id="@+id/tv_vendor_product"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="#7A7A7A"
+                    android:textSize="11sp"
+                    android:singleLine="true"
+                    android:visibility="gone" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- 가격 + 합계 -->
@@ -106,34 +123,34 @@
             android:layout_marginBottom="12dp"
             android:background="#EEEEEE" />
 
-        <!-- 옵션 + 선택 버튼 -->
-        <RelativeLayout
+        <!-- 옵션 (위) + 선택 버튼 (아래 우측) — 옵션이 동적으로 길어져도 버튼과 안 겹침 -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
             <LinearLayout
                 android:id="@+id/options_container"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_alignParentStart="true"
                 android:orientation="vertical" />
 
             <TextView
                 android:id="@+id/btn_select"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
+                android:layout_gravity="end"
+                android:layout_marginTop="12dp"
                 android:background="@drawable/btn_vendor_select"
                 android:duplicateParentState="true"
-                android:paddingStart="18dp"
-                android:paddingEnd="18dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
+                android:paddingStart="22dp"
+                android:paddingEnd="22dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
                 android:text="선택"
                 android:textColor="@color/vendor_select_text"
                 android:textSize="13sp" />
-        </RelativeLayout>
+        </LinearLayout>
 
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

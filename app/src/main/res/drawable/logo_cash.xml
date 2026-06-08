@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  무통장 입금 로고.
+  - 라임 그린 통장 모양 + 흰색 줄로 계좌 표시
+  - 우상단 ₩ 표시용 작은 원
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- 통장 본체 (둥근 사각형) -->
+    <path
+        android:fillColor="#7AB648"
+        android:pathData="M8,14 L40,14 A2,2 0 0 1 42,16 L42,36 A2,2 0 0 1 40,38 L8,38 A2,2 0 0 1 6,36 L6,16 A2,2 0 0 1 8,14 Z" />
+
+    <!-- 상단 강조 띠 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M6,18 L42,18 L42,21 L6,21 Z" />
+
+    <!-- 계좌 라인 1 (긴 줄) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M10,25 L38,25 L38,27 L10,27 Z" />
+
+    <!-- 계좌 라인 2 (중간 줄) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M10,30 L30,30 L30,32 L10,32 Z" />
+
+    <!-- ₩ 마크: 우하단 동전 (원 배경) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M36,32 m-5,0 a5,5 0 1 0 10,0 a5,5 0 1 0 -10,0" />
+
+    <!-- ₩ 마크: 동전 안 V 모양 (W 윗부분) -->
+    <path
+        android:fillColor="#7AB648"
+        android:strokeColor="#7AB648"
+        android:strokeWidth="0.8"
+        android:pathData="M33,30 L34.5,34 L36,31.5 L37.5,34 L39,30" />
+
+    <!-- ₩ 마크: 가로 줄 -->
+    <path
+        android:fillColor="#7AB648"
+        android:pathData="M32.5,32.5 L39.5,32.5 L39.5,33 L32.5,33 Z" />
+</vector>
