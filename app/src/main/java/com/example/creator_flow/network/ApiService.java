@@ -241,6 +241,12 @@ public interface ApiService {
             @Query("group_id") String groupId
     );
 
+    /** 프로젝트 그룹 태그 조회 */
+    @GET("projects/{project_id}/groups")
+    Call<List<JsonObject>> getProjectTag(
+            @Path("project_id") String projectId
+    );
+
     /** 프로젝트 그룹 태그 해제 */
     @DELETE("projects/{project_id}/groups/{group_id}")
     Call<JsonObject> untagGroup(

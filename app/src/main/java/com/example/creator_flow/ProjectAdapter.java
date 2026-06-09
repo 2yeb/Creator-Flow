@@ -18,7 +18,7 @@ public class ProjectAdapter extends RecyclerView.Adapter<ProjectAdapter.ProjectV
     }
 
     public interface OnProjectLongClickListener {
-        void onProjectLongClick(ProjectItem project, String currnetGroupId);
+        void onProjectLongClick(ProjectItem project, String currentGroupId);
     }
 
     private final List<ProjectItem> projects = new ArrayList<>();

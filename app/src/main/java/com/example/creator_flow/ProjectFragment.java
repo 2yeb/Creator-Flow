@@ -76,7 +76,7 @@ public class ProjectFragment extends Fragment {
         });
 
         // 프로젝트 페이지 이동 버튼
-        view.findViewById(R.id.btn_open_project_page).setOnClickListener(v -> {
+        /**view.findViewById(R.id.btn_open_project_page).setOnClickListener(v -> {
             // TODO: 프로젝트 목록에서 선택한 실제 project ID를 전달하세요
             String selectedProjectId = null; // 예: "uuid-from-project-list"
             getParentFragmentManager().beginTransaction()
@@ -84,7 +84,7 @@ public class ProjectFragment extends Fragment {
                             ProjectPageFragment.newInstance(selectedProjectId))
                     .addToBackStack(null)
                     .commit();
-        });
+        });*/
 
     }
 

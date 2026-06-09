@@ -63,7 +63,6 @@ public class GroupListFragment extends Fragment {
                 (group, position) -> { showDeleteDialog(group, position); }
         );
         groupRecyclerView.setAdapter(groupAdapter);
-        groupRecyclerView.setAdapter(groupAdapter);
 
         btnGroupDialogOpen.setOnClickListener(v -> addNewGroup());
 
@@ -107,115 +106,139 @@ public class GroupListFragment extends Fragment {
     // GroupListFragment.java 내부의 서버 조회 메서드 교체 및 추가
 
     private void fetchGroupListFromServer() {
-        // 1. 먼저 정식 그룹 목록을 서버에서 가져옵니다.
+        if (!isAdded() || getContext() == null) return;
+        // 1. 서버에서 그룹 목록을 불러옴
         apiService.getGroups().enqueue(new Callback<List<GroupListResponse>>() {
             @Override
             public void onResponse(@NonNull Call<List<GroupListResponse>> call, @NonNull Response<List<GroupListResponse>> response) {
                 if (response.isSuccessful() && response.body() != null) {
-                    List<GroupListResponse> serverGroups = response.body();
+                    groupList.clear();
 
-                    // 임시 가공용 리스트 생성
-                    List<GroupItem> parsedGroups = new ArrayList<>();
+                    List<GroupListResponse> responses = response.body();
 
-                    // 기존 화면의 색상 테마 설정을 그대로 유지하기 위한 배열
-                    int[] themeColors = {
-                            R.color.buttoncolor1,
-                            R.color.group_yellow, // 프로젝트에 선언된 테마 색상 ID들로 채워주세요
-                            R.color.group_pink,
-                            R.color.group_blue
+                    // 각 그룹이 생성될 때 번갈아가며 적용될 색상 배열 정의
+                    int[][] colorPalette = {
+                            { R.color.group_yellow, R.color.group_dark_yellow },
+                            { R.color.group_pink,   R.color.group_dark_pink },
+                            { R.color.buttoncolor1,   R.color.group_dark_green },
+                            { R.color.group_blue,  R.color.group_dark_blue }
                     };
 
-                    for (int i = 0; i < serverGroups.size(); i++) {
-                        GroupListResponse g = serverGroups.get(i);
-                        // 순서대로 테마 색상을 배정합니다.
-                        int colorResId = themeColors[i % themeColors.length];
+                    // 서버에서 받아온 정식 그룹 틀 준비 + 색상 변경
+                    for (int i = 0; i < responses.size(); i++) {
+                        GroupListResponse res = responses.get(i);
 
-                        // 각 그룹 객체 생성 (기본값으로 프로젝트 리스트는 우선 빈 리스트 주입)
-                        // 만약 백엔드의 getGroups() 응답 내부에 projects 데이터가 이미 포함되어 내려온다면 g.getProjects()를 넣으시면 됩니다.
-                        parsedGroups.add(new GroupItem(g.getId(), g.getKeyword(), colorResId, new ArrayList<>()));
+                        // 현재 순번에 맞는 색상 쌍 추출
+                        int[] assignedColors = colorPalette[i % colorPalette.length];
+                        int backgroundColor = assignedColors[0]; // 연한 색
+                        int strokePointColor = assignedColors[1]; // 진한 색
+
+                        // (※ GroupItem 클래스 생성자에 인자(int strokeColor)를 하나 더 추가하셔야 합니다)
+                        GroupItem item = new GroupItem(
+                                res.getId(),
+                                res.getKeyword(),
+                                backgroundColor,   // 배경색
+                                strokePointColor,  // 아이콘/텍스트/화살표용 진한 색
+                                new ArrayList<>()
+                        );
+                        groupList.add(item);
                     }
 
-                    // 2. 그룹 파싱이 끝나면, 전체 프로젝트 목록을 조회하러 이동합니다.
-                    fetchTotalProjectsAndMerge(parsedGroups);
+                    // 2단계: 프로젝트 목록을 조회하러 이동
+                    fetchRawProjectsAndMap();
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<List<GroupListResponse>> call, @NonNull Throwable t) {
-                if (isAdded()) {
-                    Toast.makeText(getContext(), "그룹 목록을 불러오지 못했습니다.", Toast.LENGTH_SHORT).show();
-                }
+                if (isAdded()) Toast.makeText(getContext(), "그룹 목록을 불러오지 못했습니다.", Toast.LENGTH_SHORT).show();
             }
         });
     }
 
     /**
-     * 전체 프로젝트 리스트를 가져와 어느 그룹에도 속하지 않은 것을 "미분류 프로젝트" 묶음으로 생성합니다.
+     *  GET projects/{project_id}/groups 로 그룹과 프로젝트 연결
      */
-    private void fetchTotalProjectsAndMerge(List<GroupItem> officialGroups) {
-        // ApiService에 정의된 프로젝트 전체 조회 API 호출 (예시: getProjects() 혹은 getAllProjects())
-        // 만약 ApiService 인터페이스에 없다면 Call<List<ProjectItem>> 함수를 호출해주어야 합니다.
+    private void fetchRawProjectsAndMap() {
         apiService.getProjects().enqueue(new Callback<List<ProjectListResponse>>() {
             @Override
             public void onResponse(@NonNull Call<List<ProjectListResponse>> call, @NonNull Response<List<ProjectListResponse>> response) {
-                if (response.isSuccessful() && response.body() != null && isAdded()) {
+                if (response.isSuccessful() && response.body() != null) {
+                    List<ProjectListResponse> rawProjects = response.body();
 
-                    // 1. 서버로부터 받은 원본 ProjectListResponse 리스트
-                    List<ProjectListResponse> serverProjects = response.body();
+                    // '기타' 그룹 생성
+                    GroupItem unclassifiedGroup = new GroupItem("unclassified_dummy_id", "기타", R.color.buttoncolor1, R.color.group_dark_green, new ArrayList<>());
 
-                    // 2. 제네릭 에러를 해결하기 위해 화면 전용 모델인 ProjectItem 리스트로 변환
-                    List<ProjectItem> allProjects = new ArrayList<>();
-                    for (ProjectListResponse sp : serverProjects) {
-                        // ※ ProjectListResponse의 getter 메서드 명칭(getId, getName, getStatus 등)에 맞게 수동 매핑해 줍니다.
-                        // 만약 가용 가능한 getter 이름이 다르다면 sp.getxxx() 부분을 실제 명칭으로 수정해 주세요.
-                        allProjects.add(new ProjectItem(sp.getId(), sp.getName(), "진행중"));
+                    final int totalProjects = rawProjects.size();
+                    if (totalProjects == 0) {
+                        groupList.add(unclassifiedGroup);
+                        groupAdapter.notifyDataSetChanged();
+                        return;
                     }
 
-                    // 3. 그룹에 노출되고 있는 프로젝트들의 ID를 HashSet에 전부 수집
-                    java.util.HashSet<String> groupedProjectIds = new java.util.HashSet<>();
-                    for (GroupItem group : officialGroups) {
-                        if (group.getProjects() != null) {
-                            for (ProjectItem p : group.getProjects()) {
-                                groupedProjectIds.add(p.getId());
-                            }
-                        }
-                    }
+                    final int[] completedCount = {0};
 
-                    // 4. 전체 프로젝트 목록을 순회하며, 그룹에 포함되지 않은 프로젝트만 선별
-                    List<ProjectItem> unclassifiedList = new ArrayList<>();
-                    for (ProjectItem p : allProjects) {
-                        if (!groupedProjectIds.contains(p.getId())) {
-                            unclassifiedList.add(p);
-                        }
-                    }
-
-                    // 5. 미분류 프로젝트가 단 1개라도 존재한다면 가짜 그룹 탭을 생성
-                    if (!unclassifiedList.isEmpty()) {
-                        GroupItem unclassifiedDummyGroup = new GroupItem(
-                                "unclassified_dummy_id",    // 임의의 가짜 ID 지정
-                                "기타",                          // 노출될 타이틀 이름
-                                R.color.buttoncolor1,          // 미분류 전용 테마 색상
-                                unclassifiedList             // 선별된 프로젝트 목록 주입
+                    for (ProjectListResponse rawProject : rawProjects) {
+                        // ProjectListResponse 객체의 Getter에 맞춰 UI용 ProjectItem을 생성
+                        ProjectItem projectItem = new ProjectItem(
+                                rawProject.getId(),
+                                rawProject.getName(),
+                                rawProject.getStatus()
                         );
-                        // 미분류는 기본적으로 펼침(Expanded) 상태로 적용
-                        unclassifiedDummyGroup.setExpanded(true);
 
-                        // 정식 리스트 최하단에 결합
-                        officialGroups.add(unclassifiedDummyGroup);
+                        // 2. ApiService.java 실제 명세에 맞춰 getProjectTag 호출 및 List<JsonObject> 파싱
+                        apiService.getProjectTag(projectItem.getId()).enqueue(new Callback<List<JsonObject>>() {
+                            @Override
+                            public void onResponse(@NonNull Call<List<JsonObject>> call, @NonNull Response<List<JsonObject>> response) {
+                                if (response.isSuccessful() && response.body() != null && !response.body().isEmpty()) {
+
+                                    // List<JsonObject>에서 첫 번째 매핑 객체를 안전하게 꺼냅니다.
+                                    JsonObject firstGroup = response.body().get(0);
+
+                                    // 매핑 테이블에서 group_id 혹은 id를 문자열로 추출
+                                    String matchedGroupId = "";
+                                    if (firstGroup.has("id")) {
+                                        matchedGroupId = firstGroup.get("id").getAsString();
+                                    } else if (firstGroup.has("group_id")) {
+                                        matchedGroupId = firstGroup.get("group_id").getAsString();
+                                    }
+
+                                    // 내 groupList에서 매칭되는 그룹을 찾아 프로젝트를 바인딩
+                                    for (GroupItem g : groupList) {
+                                        if (g.getId().equals(matchedGroupId)) {
+                                            g.getProjects().add(projectItem);
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    // 매핑 정보가 없음 -> '기타' 에 배치
+                                    unclassifiedGroup.getProjects().add(projectItem);
+                                }
+
+                                // 모든 프로젝트의 비동기 매핑 순회가 끝났는지 트래킹 후 화면 일괄 리프레시
+                                completedCount[0]++;
+                                if (completedCount[0] == totalProjects) {
+                                    groupList.add(unclassifiedGroup);
+                                    groupAdapter.notifyDataSetChanged();
+                                }
+                            }
+
+                            @Override
+                            public void onFailure(@NonNull Call<List<JsonObject>> call, @NonNull Throwable t) {
+                                unclassifiedGroup.getProjects().add(projectItem);
+                                completedCount[0]++;
+                                if (completedCount[0] == totalProjects) {
+                                    groupList.add(unclassifiedGroup);
+                                    groupAdapter.notifyDataSetChanged();
+                                }
+                            }
+                        });
                     }
-
-                    // 6. 최종 병합된 리스트를 원본 리스트에 덮어쓰고 어댑터 갱신
-                    groupList.clear();
-                    groupList.addAll(officialGroups);
-                    groupAdapter.notifyDataSetChanged();
                 }
             }
-
             @Override
             public void onFailure(@NonNull Call<List<ProjectListResponse>> call, @NonNull Throwable t) {
-                if (isAdded()) {
-                    Toast.makeText(getContext(), "전체 프로젝트 목록 연동 실패", Toast.LENGTH_SHORT).show();
-                }
+                if (isAdded()) Toast.makeText(getContext(), "프로젝트 목록 로드 실패", Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -282,6 +305,7 @@ public class GroupListFragment extends Fragment {
                                 createdGroup.getId(),
                                 createdGroup.getKeyword(),
                                 R.color.buttoncolor1, // 기본 생성 칼라 지정
+                                R.color.group_dark_green,
                                 new ArrayList<>()
                         );
 
@@ -346,7 +370,7 @@ public class GroupListFragment extends Fragment {
                     if (response.isSuccessful()) {
                         successCount[0]++;
 
-                        // 태그가 전부 안전하게 해제 완료되었을 때만 최종적으로 그룹 삭제 수행!
+                        // 태그가 전부 안전하게 해제 완료되었을 때만 최종적으로 그룹 삭제 수행
                         if (successCount[0] == totalProjects) {
                             deleteGroupFromServer(groupId, position);
                         }
@@ -430,59 +454,45 @@ public class GroupListFragment extends Fragment {
     private void showMoveGroupDialog(ProjectItem project, String currentGroupId) {
         if (getContext() == null || groupList == null) return;
 
-        // 1. 다이얼로그 목록에 표시할 그룹 이름
-        List<String> groupNames = new ArrayList<>();
+        List<String> dialogOptions = new ArrayList<>();
         final List<GroupItem> targetGroups = new ArrayList<>(groupList);
 
         for (GroupItem group : targetGroups) {
-            groupNames.add(group.getKeyword());
+            dialogOptions.add(group.getKeyword());
         }
 
-        // 2. AlertDialog 빌드 및 목록 아이템 클릭 리스너 설정
         new AlertDialog.Builder(getContext())
                 .setTitle("프로젝트 그룹 이동")
-                .setItems(groupNames.toArray(new String[0]), (dialog, which) -> {
+                .setItems(dialogOptions.toArray(new String[0]), (dialog, which) -> {
 
                     GroupItem selectedGroup = targetGroups.get(which);
                     String targetGroupId = selectedGroup.getId();
 
-                    // [체크] 선택한 대상이 '기타' 그룹인지 판별 (ID 또는 키워드 이름 기준)
                     boolean isTargetUnclassified = "unclassified_dummy_id".equals(targetGroupId)
                             || "기타".equals(selectedGroup.getKeyword());
 
-                    // [체크] 현재 프로젝트의 소속 상태 정의 (null이거나 더미ID면 미분류 상태로 간주)
                     boolean isCurrentUnclassified = (currentGroupId == null
                             || "unclassified_dummy_id".equals(currentGroupId)
                             || currentGroupId.isEmpty());
 
-                    // --------------------------------------------------------
-                    // 기존 그룹과 동일한 그룹을 선택한 경우 -> 아무런 작업도 하지 않음
-                    // --------------------------------------------------------
                     if (isCurrentUnclassified && isTargetUnclassified) {
                         Toast.makeText(getContext(), "이미 기타 그룹에 속해 있습니다.", Toast.LENGTH_SHORT).show();
                         return;
                     }
                     if (!isCurrentUnclassified && currentGroupId.equals(targetGroupId)) {
-                        Toast.makeText(getContext(), "이미 해당 그룹에 속해 있습니다.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getContext(), "이미 그룹에 속해 있습니다.", Toast.LENGTH_SHORT).show();
                         return;
                     }
 
-                    // --------------------------------------------------------
-                    // 다른 그룹을 선택한 경우
-                    // --------------------------------------------------------
                     if (isTargetUnclassified) {
-                        // [케이스 A] 정식 그룹 -> 기타 그룹으로 이동
+                        // 그룹 -> 기타 그룹으로 이동 (untag)
                         if (!isCurrentUnclassified) {
                             apiService.untagGroup(project.getId(), currentGroupId).enqueue(new Callback<JsonObject>() {
                                 @Override
                                 public void onResponse(@NonNull Call<JsonObject> call, @NonNull Response<JsonObject> response) {
                                     if (response.isSuccessful() && isAdded()) {
                                         Toast.makeText(getContext(), "그룹 지정이 해제되었습니다.", Toast.LENGTH_SHORT).show();
-
-                                        // API 변경이 불가능하므로 로컬 메모리에서 프로젝트 위치를 강제로 이동
-                                        moveProjectInLocalMemory(project, currentGroupId, targetGroupId);
-                                    } else {
-                                        if (isAdded()) Toast.makeText(getContext(), "그룹 해제 실패", Toast.LENGTH_SHORT).show();
+                                        fetchGroupListFromServer(); // API 호출로 새로고침
                                     }
                                 }
 
@@ -493,16 +503,15 @@ public class GroupListFragment extends Fragment {
                             });
                         }
                     } else {
-                        // [케이스 B] 다른 정식 그룹으로 이동하는 경우 (기존 매핑 해제 후 새 매핑 등록)
+                        // 다른 그룹으로 이동 (untag -> tag)
                         if (!isCurrentUnclassified) {
                             apiService.untagGroup(project.getId(), currentGroupId).enqueue(new Callback<JsonObject>() {
                                 @Override
                                 public void onResponse(@NonNull Call<JsonObject> call, @NonNull Response<JsonObject> response) {
                                     if (response.isSuccessful() && isAdded()) {
-                                        executeTagGroup(project, currentGroupId, targetGroupId);
+                                        executeTagGroup(project.getId(), targetGroupId);
                                     } else {
-                                        // 예외 방어: 서버 DB가 어떤 이유로 비어있어 DELETE가 실패하더라도 POST 등록을 이어서 진행시킵니다.
-                                        executeTagGroup(project, currentGroupId, targetGroupId);
+                                        executeTagGroup(project.getId(), targetGroupId);
                                     }
                                 }
 
@@ -512,8 +521,8 @@ public class GroupListFragment extends Fragment {
                                 }
                             });
                         } else {
-                            // 원래 '기타' 상태였다면 끊어낼 행이 없으므로 바로 새 그룹 태그 수행
-                            executeTagGroup(project, currentGroupId, targetGroupId);
+                            // 원래 기타 상태였다면 바로 새 매핑 생성(POST)
+                            executeTagGroup(project.getId(), targetGroupId);
                         }
                     }
                 })
@@ -522,19 +531,15 @@ public class GroupListFragment extends Fragment {
     }
 
     /**
-     * 프로젝트에 새로운 그룹 태그를 등록
+     * project_group_map에 새 데이터 등록 후 체인 새로고침 호출
      */
-    private void executeTagGroup(ProjectItem project, String oldGroupId, String targetGroupId) {
-        apiService.tagGroup(project.getId(), targetGroupId).enqueue(new Callback<JsonObject>() {
+    private void executeTagGroup(String projectId, String targetGroupId) {
+        apiService.tagGroup(projectId, targetGroupId).enqueue(new Callback<JsonObject>() {
             @Override
             public void onResponse(@NonNull Call<JsonObject> call, @NonNull Response<JsonObject> response) {
                 if (response.isSuccessful() && isAdded()) {
                     Toast.makeText(getContext(), "그룹이 변경되었습니다.", Toast.LENGTH_SHORT).show();
-
-                    // API 변경이 불가능하므로 로컬 메모리에서 프로젝트 위치를 강제로 이동
-                    moveProjectInLocalMemory(project, oldGroupId, targetGroupId);
-                } else {
-                    if (isAdded()) Toast.makeText(getContext(), "새 그룹 지정 실패", Toast.LENGTH_SHORT).show();
+                    fetchGroupListFromServer(); // API 호출로 새로고침
                 }
             }
 
@@ -543,60 +548,5 @@ public class GroupListFragment extends Fragment {
                 if (isAdded()) Toast.makeText(getContext(), "네트워크 통신 실패", Toast.LENGTH_SHORT).show();
             }
         });
-    }
-
-    private void moveProjectInLocalMemory(ProjectItem project, String oldGroupId, String targetGroupId) {
-        if (groupList == null || groupAdapter == null) return;
-
-        ProjectItem targetProjectObject = null;
-
-        // 1. 기존 소속 그룹 리스트에서 해당 프로젝트 객체를 찾아 제거(Remove)합니다.
-        for (GroupItem group : groupList) {
-            String gId = group.getId();
-
-            // 기존 소속 ID가 일치하거나, 기존 소속이 기타인 경우를 안전하게 매칭
-            boolean isOldUnclassified = (oldGroupId == null || "unclassified_dummy_id".equals(oldGroupId) || oldGroupId.isEmpty());
-            boolean isGroupUnclassified = ("unclassified_dummy_id".equals(gId) || "기타".equals(group.getKeyword()));
-
-            if ((isOldUnclassified && isGroupUnclassified) || (!isOldUnclassified && oldGroupId.equals(gId))) {
-                List<ProjectItem> projects = group.getProjects();
-                if (projects != null) {
-                    for (int i = 0; i < projects.size(); i++) {
-                        if (projects.get(i).getId().equals(project.getId())) {
-                            targetProjectObject = projects.remove(i); // 기존 리스트에서 원본 객체를 꺼내며 삭제
-                            break;
-                        }
-                    }
-                }
-            }
-            if (targetProjectObject != null) break;
-        }
-
-        // 혹시 리스트 꼬임으로 원본 객체를 못 찾았을 경우를 대비해 파라미터 객체로 백업
-        if (targetProjectObject == null) {
-            targetProjectObject = project;
-        }
-
-        // 2. 이동하고자 하는 새로운 타겟 그룹을 찾아 프로젝트를 add 함
-        for (GroupItem group : groupList) {
-            String gId = group.getId();
-            boolean isTargetUnclassified = "unclassified_dummy_id".equals(targetGroupId) || "기타".equals(group.getKeyword());
-            boolean isGroupUnclassified = ("unclassified_dummy_id".equals(gId) || "기타".equals(group.getKeyword()));
-
-            if (isTargetUnclassified && isGroupUnclassified) {
-                // 타겟이 '기타' 그룹인 경우
-                if (group.getProjects() == null) group.setProjects(new ArrayList<>());
-                group.getProjects().add(targetProjectObject);
-                break;
-            } else if (targetGroupId != null && targetGroupId.equals(gId)) {
-                // 타겟이 특정 그룹인 경우
-                if (group.getProjects() == null) group.setProjects(new ArrayList<>());
-                group.getProjects().add(targetProjectObject);
-                break;
-            }
-        }
-
-        // 3. 어댑터에 데이터가 통째로 변경되었음을 알려 리사이클러뷰를 즉각 다시 그리게 만듭니다.
-        groupAdapter.notifyDataSetChanged();
     }
 }

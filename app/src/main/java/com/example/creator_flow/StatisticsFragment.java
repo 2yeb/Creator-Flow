@@ -37,6 +37,11 @@ public class StatisticsFragment extends Fragment {
     private TodoAdapter todoAdapter;
     private ApiService apiService;
 
+    private RecyclerView planningRecycle;
+    private RecyclerView progressingRecycle;
+    private RecyclerView completedRecycle;
+    private RecyclerView todoRecycler;
+
     private List<TodoItem> todoList = new ArrayList<>();
     private String projectId = "current_project_id"; // To-Do 등록용 예시 ID
 
@@ -53,6 +58,16 @@ public class StatisticsFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         apiService = RetrofitClient.getApi(requireContext());
+
+        planningRecycle = view.findViewById(R.id.planning_recycle);
+        progressingRecycle = view.findViewById(R.id.progressing_recycle);
+        completedRecycle = view.findViewById(R.id.completed_recycle);
+        todoRecycler = view.findViewById(R.id.todo_recycler);
+
+        planningRecycle.setNestedScrollingEnabled(false);
+        progressingRecycle.setNestedScrollingEnabled(false);
+        completedRecycle.setNestedScrollingEnabled(false);
+        todoRecycler.setNestedScrollingEnabled(false);
 
         // 리사이클러뷰 및 어댑터 초기화
         initProjectRecyclerViews();

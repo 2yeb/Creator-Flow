@@ -6,21 +6,23 @@ import java.util.List;
 public class GroupItem {
     private String id;
     private String keyword;
-    private int colorResId;
+    private int backgroundColor;
+    private int strokePointColor;
     private List<ProjectItem> projects;
     private boolean isExpanded;
 
-    public GroupItem(String id, String keyword, int colorResId, List<ProjectItem> projects) {
+    public GroupItem(String id, String keyword, int backgroundColor, int strokePointColor, List<ProjectItem> projects) {
         this.id = id;
         this.keyword = keyword;
-        this.colorResId = colorResId;
-        this.projects = projects != null ? projects : new ArrayList<>();
-        this.isExpanded = true;
+        this.backgroundColor = backgroundColor;
+        this.strokePointColor = strokePointColor;
+        this.projects = projects;
     }
 
     public String getId() { return id; }
     public String getKeyword() { return keyword; }
-    public int getColorResId() { return colorResId; }
+    public int getBackgroundColor() { return backgroundColor; }
+    public int getStrokePointColor() { return strokePointColor; }
     public List<ProjectItem> getProjects() { return projects; }
     public void setProjects(List<ProjectItem> projects) { this.projects = projects; }
 
