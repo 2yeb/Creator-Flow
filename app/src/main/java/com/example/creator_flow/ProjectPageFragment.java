@@ -607,18 +607,32 @@ public class ProjectPageFragment extends Fragment {
         }
     }
 
-    /** 확인 다이얼로그 표시 후 OK 시 DELETE 호출 */
+    /**
+     * 커스텀 삭제 확인 다이얼로그 표시 (흰 카드 + 라임 X / 확인 버튼).
+     * 확인 클릭 시 DELETE /projects/{id} 호출.
+     */
     private void confirmAndDeleteProject() {
         if (projectId == null) {
             Toast.makeText(requireContext(), "프로젝트 ID가 없어 삭제할 수 없습니다.", Toast.LENGTH_SHORT).show();
             return;
         }
-        new AlertDialog.Builder(requireContext())
-                .setTitle("프로젝트 삭제")
-                .setMessage("이 프로젝트를 정말 삭제하시겠습니까? 모든 차시 데이터가 함께 삭제됩니다.")
-                .setNegativeButton("취소", null)
-                .setPositiveButton("삭제", (dialog, which) -> deleteProjectFromServer())
-                .show();
+        final android.app.Dialog dialog = new android.app.Dialog(requireContext());
+        View view = LayoutInflater.from(requireContext())
+                .inflate(R.layout.dialog_delete_project, null);
+        dialog.setContentView(view);
+        if (dialog.getWindow() != null) {
+            // 시스템 회색 배경 제거 — 커스텀 카드만 보이도록
+            dialog.getWindow().setBackgroundDrawable(
+                    new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        }
+        view.findViewById(R.id.btn_dialog_close)
+                .setOnClickListener(v -> dialog.dismiss());
+        view.findViewById(R.id.btn_dialog_confirm)
+                .setOnClickListener(v -> {
+                    dialog.dismiss();
+                    deleteProjectFromServer();
+                });
+        dialog.show();
     }
 
     /** DELETE /projects/{id} 호출 후 성공 시 이전 화면으로 복귀 */

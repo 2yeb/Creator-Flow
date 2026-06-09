@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 그룹명 EditText 배경 — 라임 외곽선 + 연한 라임 배경 + 둥근 모서리 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
     <stroke
-        android:color="@color/outline"
-        android:width="1dp" />
-    <corners android:radius="10dp" />
-    <solid android:color="#F6F6F6" />
+        android:color="#B8E060"
+        android:width="2dp" />
+    <corners android:radius="22dp" />
+    <solid android:color="#F5FAE0" />
 </shape>

@@ -642,19 +642,22 @@
 
         </LinearLayout>
 
-        <!-- ===== 파일 삭제 버튼 ===== -->
+        <!-- ===== 프로젝트 삭제 버튼 ===== -->
         <Button
             android:id="@+id/btn_delete_file"
-            android:layout_width="120dp"
+            android:layout_width="140dp"
             android:layout_height="40dp"
             android:layout_gravity="center_horizontal"
             app:backgroundTint="#FF6B6B"
-            android:text="파일 삭제"
+            android:text="프로젝트 삭제"
             android:gravity="center"
             android:textAlignment="center"
             android:textColor="@color/white"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:includeFontPadding="false"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp" />
 
     </LinearLayout>
 </ScrollView>
