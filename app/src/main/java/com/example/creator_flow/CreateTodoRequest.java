@@ -2,7 +2,7 @@ package com.example.creator_flow;
 
 import com.google.gson.annotations.SerializedName;
 
-public class CreateTodoRequest {
+public class  CreateTodoRequest {
     @SerializedName("content")
     private String content;
 

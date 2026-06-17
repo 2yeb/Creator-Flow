@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 얇은 chevron (>) — stroke 기반, lime 색 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="8dp"
+    android:height="14dp"
+    android:viewportWidth="8"
+    android:viewportHeight="14">
+    <path
+        android:pathData="M1,12.5098 L6.2476,7.4764 C6.65797,7.08278 6.65797,6.42664 6.2476,6.03303 L0.999999,0.999656"
+        android:strokeWidth="2"
+        android:strokeColor="#B8E060"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>

@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
     tools:context=".ProjectPageFragment">
+
+<ScrollView
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -17,6 +21,7 @@
         android:clipToPadding="false">
 
         <!-- ===== 파일 UI (초록 배경 카드 안에 폴더) ===== -->
+        <!-- paddingTop: 상태바 + 뒤로가기 버튼 영역(86dp)을 피하고 차시 탭이 클릭 가능하게 -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -26,7 +31,7 @@
             android:background="@drawable/project_page_header"
             android:paddingStart="20dp"
             android:paddingEnd="20dp"
-            android:paddingTop="20dp"
+            android:paddingTop="100dp"
             android:paddingBottom="24dp">
 
             <androidx.constraintlayout.widget.ConstraintLayout
@@ -121,6 +126,8 @@
                         android:layout_marginStart="16dp"
                         android:layout_marginTop="10dp"
                         android:background="@drawable/outline_white"
+                        android:popupBackground="@drawable/spinner_popup_bg"
+                        android:dropDownVerticalOffset="34dp"
                         android:minWidth="100dp"
                         android:padding="4dp"
                         app:layout_constraintBottom_toTopOf="@id/folder_calendar"
@@ -199,7 +206,7 @@
 
             <!-- 단가 -->
             <LinearLayout
-                android:layout_width="180dp"
+                android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginBottom="8dp"
                 android:background="@drawable/project_section_field"
@@ -214,19 +221,33 @@
                     android:textColor="@color/text_color"
                     android:textSize="14sp" />
 
+                <!-- 단가는 시뮬레이터에서 자동 계산되어 들어오는 값이라 사용자 입력 차단 (read-only) -->
                 <EditText
                     android:id="@+id/et_price"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:minWidth="40dp"
                     android:background="@null"
-                    android:inputType="numberDecimal"
-                    android:textSize="14sp" />
+                    android:inputType="none"
+                    android:textSize="14sp"
+                    android:focusable="false"
+                    android:focusableInTouchMode="false"
+                    android:clickable="false"
+                    android:longClickable="false"
+                    android:cursorVisible="false" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="원"
+                    android:textColor="@color/text_color"
+                    android:textSize="13sp"
+                    android:paddingEnd="10dp" />
             </LinearLayout>
 
             <!-- 수량 -->
             <LinearLayout
-                android:layout_width="180dp"
+                android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginBottom="8dp"
                 android:background="@drawable/project_section_field"
@@ -243,17 +264,25 @@
 
                 <EditText
                     android:id="@+id/et_quantity"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:minWidth="30dp"
                     android:background="@null"
                     android:inputType="number"
                     android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="개"
+                    android:textColor="@color/text_color"
+                    android:textSize="13sp"
+                    android:paddingEnd="10dp" />
             </LinearLayout>
 
             <!-- 판매가 -->
             <LinearLayout
-                android:layout_width="180dp"
+                android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginBottom="8dp"
                 android:background="@drawable/project_section_field"
@@ -270,23 +299,32 @@
 
                 <EditText
                     android:id="@+id/et_retail_price"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:minWidth="40dp"
                     android:background="@null"
                     android:inputType="numberDecimal"
                     android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="원"
+                    android:textColor="@color/text_color"
+                    android:textSize="13sp"
+                    android:paddingEnd="10dp" />
             </LinearLayout>
 
             <!-- 제작 업체 -->
             <LinearLayout
-                android:layout_width="180dp"
+                android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginBottom="8dp"
                 android:background="@drawable/project_section_field"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="12dp">
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -297,22 +335,26 @@
 
                 <EditText
                     android:id="@+id/et_manufacturer"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:minWidth="60dp"
                     android:background="@null"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:inputType="text" />
             </LinearLayout>
 
             <!-- 판매 업체 -->
             <LinearLayout
-                android:layout_width="180dp"
+                android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginBottom="8dp"
                 android:background="@drawable/project_section_field"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="12dp">
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -323,16 +365,19 @@
 
                 <EditText
                     android:id="@+id/et_seller"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:minWidth="60dp"
                     android:background="@null"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    android:singleLine="true"
+                    android:maxLines="1"
+                    android:inputType="text" />
             </LinearLayout>
 
             <!-- 판매 수수료 -->
             <LinearLayout
-                android:layout_width="180dp"
+                android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:layout_marginBottom="8dp"
                 android:background="@drawable/project_section_field"
@@ -349,12 +394,20 @@
 
                 <EditText
                     android:id="@+id/et_commission"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:minWidth="40dp"
                     android:background="@null"
                     android:inputType="numberDecimal"
                     android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="%"
+                    android:textColor="@color/text_color"
+                    android:textSize="13sp"
+                    android:paddingEnd="10dp" />
             </LinearLayout>
 
         </LinearLayout>
@@ -432,17 +485,17 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- 차수별 단가 라벨 -->
+        <!-- 차시별 그래프 라벨 -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="26dp"
             android:layout_marginBottom="6dp"
-            android:text="차수별 단가"
+            android:text="차시별 그래프"
             android:textColor="@color/text_color"
             android:textSize="14sp" />
 
-        <!-- 차수별 단가 카드 -->
+        <!-- 차시별 그래프 카드 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -605,3 +658,19 @@
 
     </LinearLayout>
 </ScrollView>
+
+    <!-- 뒤로가기 (좌상단, 시뮬레이션 페이지들과 동일 패턴) -->
+    <ImageView
+        android:id="@+id/btn_back"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginTop="50dp"
+        android:layout_marginStart="16dp"
+        android:src="@drawable/ic_arrow_back"
+        android:padding="6dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="뒤로" />
+
+</FrameLayout>

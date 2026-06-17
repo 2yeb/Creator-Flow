@@ -57,6 +57,10 @@
                     android:layout_width="match_parent"
                     android:layout_height="42dp"
                     android:background="@drawable/dropdown_goods_bg"
+                    android:popupBackground="@drawable/spinner_popup_bg"
+                    android:dropDownVerticalOffset="46dp"
+                    android:dropDownHorizontalOffset="0dp"
+                    android:dropDownWidth="match_parent"
                     android:entries="@array/goods_type_items"
                     android:paddingStart="20dp"
                     android:paddingEnd="44dp"
@@ -97,6 +101,10 @@
                     android:layout_width="match_parent"
                     android:layout_height="42dp"
                     android:background="@drawable/dropdown_goods_bg"
+                    android:popupBackground="@drawable/spinner_popup_bg"
+                    android:dropDownVerticalOffset="46dp"
+                    android:dropDownHorizontalOffset="0dp"
+                    android:dropDownWidth="match_parent"
                     android:paddingStart="20dp"
                     android:paddingEnd="44dp"
                     android:spinnerMode="dropdown"
@@ -177,21 +185,21 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:max="300"
-                        android:progress="10"
+                        android:max="200"
+                        android:progress="0"
                         android:progressTint="#7AB648"
                         android:thumbTint="#7AB648"/>
 
                     <EditText
                         android:id="@+id/tv_quantity_value"
-                        android:layout_width="80dp"
+                        android:layout_width="45dp"
                         android:layout_height="wrap_content"
-                        android:text="10"
-                        android:gravity="end"
+                        android:text="0"
+                        android:gravity="start"
                         android:textColor="@color/text_color"
                         android:textSize="20sp"
                         android:textStyle="bold"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="4dp"
                         android:inputType="number"
                         android:maxLength="6"
                         android:imeOptions="actionDone"
@@ -233,25 +241,27 @@
                     android:id="@+id/radio_group_delivery"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:theme="@style/LimeControlTheme">
 
-                    <RadioButton
+                    <!-- AppCompatRadioButton으로 명시 — Material3 theme override 회피 -->
+                    <androidx.appcompat.widget.AppCompatRadioButton
                         android:id="@+id/radio_direct"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="직접 배송"
                         android:checked="true"
-                        android:buttonTint="#7AB648"
+                        android:buttonTint="@color/radio_lime_tint"
                         android:textColor="@color/text_color"
                         android:textSize="15sp"
                         android:layout_marginEnd="28dp"/>
 
-                    <RadioButton
+                    <androidx.appcompat.widget.AppCompatRadioButton
                         android:id="@+id/radio_consignment"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="위탁 배송"
-                        android:buttonTint="#7AB648"
+                        android:buttonTint="@color/radio_lime_tint"
                         android:textColor="@color/text_color"
                         android:textSize="15sp"/>
 
@@ -302,7 +312,7 @@
         android:id="@+id/btn_back"
         android:layout_width="36dp"
         android:layout_height="36dp"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="50dp"
         android:layout_marginStart="16dp"
         android:src="@drawable/ic_arrow_back"
         android:padding="6dp"

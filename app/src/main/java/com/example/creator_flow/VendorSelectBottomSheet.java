@@ -169,32 +169,41 @@ public class VendorSelectBottomSheet extends BottomSheetDialogFragment {
     private void bindCard(View card, VendorInfo vendor, int cardIndex) {
         ((TextView) card.findViewById(R.id.tv_vendor_name)).setText(vendor.name);
 
-        // 로고 박스: brandColor를 fallback, logoUrl 있으면 Glide로 로드
+        // 상품명 (백엔드 VendorProduct.name) — 값 있을 때만 표시
+        TextView tvProduct = card.findViewById(R.id.tv_vendor_product);
+        if (tvProduct != null) {
+            if (vendor.productName != null && !vendor.productName.isEmpty()) {
+                tvProduct.setText(vendor.productName);
+                tvProduct.setVisibility(View.VISIBLE);
+            } else {
+                tvProduct.setVisibility(View.GONE);
+            }
+        }
+
+        // 로고 박스: PNG/JPG/WebP만 Glide로 로드. SVG/빈값은 brandColor 박스로 fallback.
         android.widget.ImageView logo = card.findViewById(R.id.iv_vendor_logo);
         if (logo != null) {
-            logo.setBackgroundTintList(
-                    android.content.res.ColorStateList.valueOf(vendor.brandColor));
-            if (vendor.logoUrl != null && !vendor.logoUrl.isEmpty()) {
+            boolean hasRasterLogo = vendor.logoUrl != null
+                    && !vendor.logoUrl.isEmpty()
+                    && !vendor.logoUrl.toLowerCase().endsWith(".svg");
+            if (hasRasterLogo) {
+                logo.setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(Color.WHITE));
+                logo.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+                logo.setPadding(dp(2), dp(2), dp(2), dp(2));
                 com.bumptech.glide.Glide.with(this)
                         .load(vendor.logoUrl)
+                        .fitCenter()
                         .into(logo);
             } else {
+                logo.setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(vendor.brandColor));
                 logo.setImageDrawable(null);
             }
         }
 
-        TextView tvBase = card.findViewById(R.id.tv_base_price);
-        TextView tvShipping = card.findViewById(R.id.tv_shipping);
-        TextView tvTotal = card.findViewById(R.id.tv_total_price);
-
-        tvBase.setText(formatWon(vendor.basePrice));
-        if (vendor.freeShipping) {
-            tvShipping.setText("+ 무료 배송");
-        } else {
-            tvShipping.setText("+ 배송 " + formatWon(vendor.shippingFee));
-        }
-        int total = vendor.basePrice + (vendor.freeShipping ? 0 : vendor.shippingFee);
-        tvTotal.setText(formatWon(total));
+        // 가격 표시 — 옵션 칩 변경 시 다시 갱신할 수 있도록 헬퍼로 분리
+        updateCardPriceText(card, vendor);
 
         // 옵션 행 동적 생성 — vendor가 지원하는 옵션을 카테고리별 chip으로 (카드별 state 사용)
         LinearLayout optionsContainer = card.findViewById(R.id.options_container);
@@ -231,31 +240,48 @@ public class VendorSelectBottomSheet extends BottomSheetDialogFragment {
             String category = entry.getKey();
             Set<String> values = entry.getValue();
 
+            // row를 match_parent + horizontal: 라벨 (좌측) + 칩 그룹 (남은 공간 + 자동 줄바꿈)
             LinearLayout row = new LinearLayout(getContext());
             row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
+            // 라벨이 상단 정렬 — 칩이 여러 줄로 펼쳐졌을 때 라벨이 첫 줄에 정렬되어 보임
+            row.setGravity(Gravity.TOP);
             LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT);
             rowLp.bottomMargin = dp(6);
             row.setLayoutParams(rowLp);
 
-            // 카테고리 라벨
+            // 카테고리 라벨 — 70dp로 키워서 "인쇄데이터", "제작방식" 등 4~5글자도 한 줄에 들어감
+            // singleLine + maxLines=1 명시 — 라벨이 좁아도 줄바꿈 안 됨
             TextView label = new TextView(getContext());
             label.setText(category);
             label.setTextColor(Color.parseColor("#7A7A7A"));
             label.setTextSize(12f);
-            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(dp(40),
+            label.setSingleLine(true);
+            label.setMaxLines(1);
+            label.setPadding(0, dp(8), dp(4), 0);
+            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(dp(70),
                     LinearLayout.LayoutParams.WRAP_CONTENT);
             label.setLayoutParams(labelLp);
             row.addView(label);
+
+            // 칩 그룹 — 화면 너비 초과 시 자동으로 다음 줄로 줄바꿈
+            com.google.android.material.chip.ChipGroup chipGroup =
+                    new com.google.android.material.chip.ChipGroup(getContext());
+            chipGroup.setChipSpacingHorizontal(dp(4));
+            chipGroup.setChipSpacingVertical(dp(4));
+            // 0dp + weight=1 = 라벨 빼고 남은 공간 모두 차지 (줄바꿈 기준)
+            LinearLayout.LayoutParams chipGroupLp = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            chipGroup.setLayoutParams(chipGroupLp);
 
             // 값 chip들 — 이 카드의 독립 state 기준
             String selectedValue = cardOpts.get(category);
             for (String value : values) {
                 TextView chip = makeChip(category, value, value.equals(selectedValue), cardIndex);
-                row.addView(chip);
+                chipGroup.addView(chip);
             }
+            row.addView(chipGroup);
             container.addView(row);
         }
     }
@@ -264,7 +290,14 @@ public class VendorSelectBottomSheet extends BottomSheetDialogFragment {
         TextView chip = new TextView(getContext());
         chip.setText(value);
         chip.setTextSize(12f);
-        chip.setPadding(dp(10), dp(3), dp(10), dp(3));
+        // 한 줄 강제 — 텍스트 긴 칩이 세로로 깨지는 것 방지 ("컬러우 이어링" 같은 케이스)
+        chip.setSingleLine(true);
+        chip.setMaxLines(1);
+        // 클릭 영역 확보 — 이전 dp(3)은 너무 작아서 MaterialCardView가 클릭 가로챔
+        chip.setPadding(dp(12), dp(8), dp(12), dp(8));
+        // 명시적으로 클릭 가능 — 부모 MaterialCardView의 clickable이 자식 클릭 흡수 방지
+        chip.setClickable(true);
+        chip.setFocusable(true);
         if (selected) {
             chip.setBackgroundResource(R.drawable.chip_selected);
             chip.setTextColor(Color.parseColor("#313131"));
@@ -276,10 +309,14 @@ public class VendorSelectBottomSheet extends BottomSheetDialogFragment {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.leftMargin = dp(4);
+        lp.topMargin = dp(2);
+        lp.bottomMargin = dp(2);
         chip.setLayoutParams(lp);
 
         // 클릭 시 이 카드의 옵션 state만 갱신 + 이 카드의 옵션 행만 재렌더 (다른 카드 영향 X)
         chip.setOnClickListener(v -> {
+            android.util.Log.d("VendorSheet",
+                    "chip click: card=" + cardIndex + ", " + category + "=" + value);
             Map<String, String> cardOpts = cardOptionMaps.get(cardIndex);
             String prev = cardOpts.get(category);
             if (value.equals(prev)) return;
@@ -289,10 +326,56 @@ public class VendorSelectBottomSheet extends BottomSheetDialogFragment {
         return chip;
     }
 
-    /** 한 카드의 옵션 chip 행만 다시 그림 (다른 카드는 건드리지 않음). */
+    /**
+     * 한 카드의 옵션 chip 행 + 가격 표시를 다시 그림.
+     * 가격은 cardOpts의 옵션들 × vendor.optionPrices로 단가 재계산 후
+     * basePrice 업데이트 → 카드의 tv_base_price / tv_total_price 갱신.
+     */
     private void rerenderCardOptionRows(int cardIndex) {
-        LinearLayout optsContainer = cardViews.get(cardIndex).findViewById(R.id.options_container);
-        renderOptionRows(optsContainer, cardVendors.get(cardIndex), cardIndex);
+        MaterialCardView card = cardViews.get(cardIndex);
+        VendorInfo vendor = cardVendors.get(cardIndex);
+
+        // ① 단가 재계산 — cardOpts의 옵션들 × vendor.optionPrices 합산
+        recalculateVendorPrice(vendor, cardOptionMaps.get(cardIndex));
+
+        // ② 가격 텍스트 갱신
+        updateCardPriceText(card, vendor);
+
+        // ③ 옵션 칩 다시 그림
+        LinearLayout optsContainer = card.findViewById(R.id.options_container);
+        renderOptionRows(optsContainer, vendor, cardIndex);
+    }
+
+    /**
+     * cardOpts의 선택된 옵션들의 extra_price 합산 → vendor.basePrice 업데이트 (× quantity).
+     * vendor.optionPrices가 null이면 (mock 모드) skip.
+     */
+    private void recalculateVendorPrice(VendorInfo vendor, Map<String, String> cardOpts) {
+        if (vendor.optionPrices == null || vendor.optionPrices.isEmpty()) return;
+        int unitCost = 0;
+        for (Map.Entry<String, String> e : cardOpts.entrySet()) {
+            Map<String, Integer> valueToPrice = vendor.optionPrices.get(e.getKey());
+            if (valueToPrice == null) continue;
+            Integer price = valueToPrice.get(e.getValue());
+            if (price != null) unitCost += price;
+        }
+        vendor.basePrice = unitCost * vendor.quantity;
+    }
+
+    /** 카드의 가격 텍스트 3개(base / shipping / total) 갱신 — bindCard + rerenderCardOptionRows 공통 사용 */
+    private void updateCardPriceText(View card, VendorInfo vendor) {
+        TextView tvBase = card.findViewById(R.id.tv_base_price);
+        TextView tvShipping = card.findViewById(R.id.tv_shipping);
+        TextView tvTotal = card.findViewById(R.id.tv_total_price);
+
+        tvBase.setText(formatWon(vendor.basePrice));
+        if (vendor.freeShipping) {
+            tvShipping.setText("+ 무료 배송");
+        } else {
+            tvShipping.setText("+ 배송 " + formatWon(vendor.shippingFee));
+        }
+        int total = vendor.basePrice + (vendor.freeShipping ? 0 : vendor.shippingFee);
+        tvTotal.setText(formatWon(total));
     }
 
     // ============= 선택 처리 =============

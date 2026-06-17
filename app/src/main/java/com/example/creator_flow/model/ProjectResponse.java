@@ -38,7 +38,11 @@ public class ProjectResponse {
         public String imageUrl;
     }
 
-    /** GET /projects/{id} 응답의 simulations[] 항목 — 차시 1개에 해당 */
+    /**
+     * GET /projects/{id} 응답의 simulations[] 항목 — 차시 1개에 해당.
+     * 2026-06 백엔드 업데이트로 vendor_name, platform_plan, unit_cost 등이 추가되어
+     * 차시당 별도 GET /simulations 호출 없이 차시 카드를 채울 수 있음.
+     */
     public static class SimulationSummary {
         @SerializedName("id")
         public String id;
@@ -63,5 +67,25 @@ public class ProjectResponse {
 
         @SerializedName("created_at")
         public String createdAt;
+
+        // ===== 2026-06 백엔드 업데이트로 추가된 필드들 =====
+
+        @SerializedName("vendor_name")
+        public String vendorName;
+
+        @SerializedName("platform_plan")
+        public String platformPlan;
+
+        @SerializedName("fee_rate")
+        public Double feeRate;
+
+        @SerializedName("unit_cost")
+        public Integer unitCost;
+
+        @SerializedName("total_cost")
+        public Integer totalCost;
+
+        @SerializedName("net_profit")
+        public Integer netProfit;
     }
 }

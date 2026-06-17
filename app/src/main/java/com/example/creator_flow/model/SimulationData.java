@@ -17,6 +17,14 @@ import java.util.List;
  */
 public class SimulationData {
 
+    /**
+     * 기존 프로젝트에 차시(simulation)를 추가하는 모드일 때 그 프로젝트의 ID.
+     * - null = 새 프로젝트 만드는 모드 (기본 흐름)
+     * - non-null = 이 ID의 프로젝트에 차시 attach (ProjectPageFragment의 + 버튼에서 진입)
+     * 시뮬레이션 완료 시 POST /simulations 호출에 project_id로 같이 보냄.
+     */
+    public static String targetProjectId;
+
     // ===== 모델 =====
     public static String modelType;        // "Business" | "Fanart"
 
@@ -33,7 +41,7 @@ public class SimulationData {
 
     // ===== Platform =====
     public static String platformName;     // 판매 업체 (윗치폼/텀블벅 등) — 표시용
-    public static Integer platformFee;     // 수수료(%) — Business일 때만 의미 있음
+    public static Double platformFee;      // 수수료(%) — 소수점 유지 (예: 4.68)
     /** POST /simulations 에 사용할 platform_plan의 실제 UUID. mock 모드에선 null */
     public static String platformPlanId;
 
@@ -53,27 +61,53 @@ public class SimulationData {
     // ===== 계산값 (백엔드 또는 클라이언트가 산출) =====
     public static Integer estimatedCost;   // 예상 원가
 
+    /**
+     * 단가 (개당 원). 시뮬레이터 detail1에서 vendor 확정 시 클라이언트가 계산한 값 보관.
+     * LOCAL_PROJECT_MODE에서 백엔드 unit_cost가 없을 때 ProjectPage 첫 차시에 채울 용도.
+     */
+    public static Integer unitCost;
+
+    /**
+     * 시연용 로컬 모드: POST /simulations 응답을 통째로 보관.
+     * ProjectPageFragment 진입 시 첫 차시에 자동 채울 때 사용.
+     * 일반 reset()에서는 비우지 않음 — ProjectPageFragment가 한 번 읽고 직접 null로 비움.
+     */
+    public static com.example.creator_flow.model.SimulationResultDto lastResult;
+
     public static void reset() {
+        targetProjectId = null;
         modelType = null;
         goodsType = null;
         subType = null;
         optionSummary = null;
-        quantity = null;
-        vendorName = null;
         vendorProductId = null;
         selectedOptionIds = null;
-        platformName = null;
-        platformFee = null;
         platformPlanId = null;
         deliveryMethod = null;
         shippingFeeType = null;
         packagingType = null;
         shippingFeeBuyer = null;
-        profit = null;
         marginRate = null;
-        targetQuantity = null;
         minStock = null;
         estimatedCost = null;
+        // ProjectPage가 읽고 직접 비우는 필드들은 보존 (lastResult/unitCost와 동일 패턴):
+        // quantity · vendorName · platformName · platformFee · targetQuantity · profit
+        // · lastResult · unitCost
+        // → ProjectPageFragment.applyLastSimulationResultToFirstChasi() 끝에서 비움.
+    }
+
+    /**
+     * ProjectPage 진입용 보관 필드까지 모두 비움.
+     * ProjectPage가 한 번 읽고 끝에 호출 — 다음 시뮬레이션 시 잔존 방지.
+     */
+    public static void clearPostNavigation() {
+        quantity = null;
+        vendorName = null;
+        platformName = null;
+        platformFee = null;
+        targetQuantity = null;
+        unitCost = null;
+        lastResult = null;
     }
 
     private SimulationData() {}

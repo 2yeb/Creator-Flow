@@ -1,7 +1,6 @@
 package com.example.creator_flow;
 
 import android.app.AlertDialog;
-import android.app.DatePickerDialog;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -48,9 +47,25 @@ import androidx.core.content.FileProvider;
 import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.fragment.app.Fragment;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.load.model.GlideUrl;
+import com.bumptech.glide.load.model.LazyHeaders;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 import com.example.creator_flow.model.ImageUploadResponse;
+import com.example.creator_flow.network.NetworkConfig;
+import com.example.creator_flow.network.TokenManager;
 import com.example.creator_flow.model.ProjectFile;
+import com.example.creator_flow.model.ProjectImageDto;
 import com.example.creator_flow.model.ProjectResponse;
+import com.example.creator_flow.model.SimulationDetailDto;
+import com.example.creator_flow.model.UpdateProjectRequest;
+import android.os.Handler;
+import android.os.Looper;
+import java.util.HashMap;
+import java.util.Map;
 import com.example.creator_flow.network.RetrofitClient;
 
 import java.io.InputStream;
@@ -78,6 +93,23 @@ import java.util.Locale;
  * - 선택된 차시에 따라 폴더 UI 색상이 노랑/파랑/보라 순으로 순환된다.
  */
 public class ProjectPageFragment extends Fragment {
+
+    /**
+     * plan_name → platform_name 매핑.
+     * GET /projects/{id} 응답 simulations[]엔 platform_plan(plan_name)만 있고
+     * platform_name이 없어서, 백엔드 plans 응답으로 미리 확인한 매핑을 정적으로 보유.
+     * (plans 응답에 platform_id가 있어 정확한 매핑 확인됨 — 2026-06-08 검증)
+     */
+    private static final java.util.Map<String, String> PLAN_TO_PLATFORM_NAME =
+            new java.util.HashMap<String, String>() {{
+                put("직접 입력", "직접 입력");
+                put("무통장",     "개인폼(무통장)");
+                put("기본",       "네이버 스마트스토어");
+                put("파도플랜",   "TMM");
+                put("Start",      "텀블벅");
+                put("슬림폼",     "윗치폼");
+                put("페이폼",     "윗치폼");
+            }};
 
     /** 서버 프로젝트 ID — newInstance()로 전달받거나 목록에서 선택 시 설정 */
     private String projectId;
@@ -145,6 +177,13 @@ public class ProjectPageFragment extends Fragment {
     private ProgressBar progressSales;     // 판매 달성률 프로그레스바
     private TextView tvSalesPercent;       // 달성 퍼센트 텍스트
     private android.widget.Button btnDeleteFile;  // 파일 삭제 버튼 (DELETE /projects/{id})
+
+    // ── 차시 자동 저장 (debounce) ────────────────────────────────────────────
+    /** EditText 입력 후 0.5초 동안 추가 입력 없으면 PUT /simulations 호출. */
+    private static final long SIM_SAVE_DEBOUNCE_MS = 500;
+    private final Handler debounceHandler = new Handler(Looper.getMainLooper());
+    /** chasiIndex → pending Runnable (같은 차시 빠른 입력 시 이전 작업 cancel) */
+    private final Map<Integer, Runnable> pendingSimSaves = new HashMap<>();
 
     public ProjectPageFragment() {}
 
@@ -239,6 +278,10 @@ public class ProjectPageFragment extends Fragment {
         tvSalesPercent        = view.findViewById(R.id.tv_sales_percent);
         btnDeleteFile         = view.findViewById(R.id.btn_delete_file);
 
+        // 뒤로가기 (시뮬레이션 페이지들과 동일 패턴)
+        view.findViewById(R.id.btn_back).setOnClickListener(v ->
+                requireActivity().getOnBackPressedDispatcher().onBackPressed());
+
         // Bundle에서 프로젝트 ID 읽기
         if (getArguments() != null) {
             projectId = getArguments().getString("project_id");
@@ -251,9 +294,86 @@ public class ProjectPageFragment extends Fragment {
         refreshPhotoBox();
 
         // 서버에서 프로젝트 데이터 로드
-        if (projectId != null) loadProjectFromServer();
+        if (projectId != null) {
+            loadProjectFromServer();
+        } else {
+            // 시연용 로컬 모드 — SimulationData.lastResult 있으면 첫 차시 자동 채움
+            applyLastSimulationResultToFirstChasi();
+        }
 
         return view;
+    }
+
+    /**
+     * 시연용 로컬 모드 진입 시 호출.
+     * SimulationData에 남아있는 시뮬레이션 결과(unit_cost, vendor 이름 등)와
+     * 사용자 입력값(quantity, vendorName, platformName)을 첫 차시에 채움.
+     * 한 번 읽고 즉시 비워서 다음 진입 때 잔존하지 않게.
+     */
+    private void applyLastSimulationResultToFirstChasi() {
+        if (fileList == null || fileList.isEmpty()) return;
+        com.example.creator_flow.model.ProjectFile first = fileList.get(0);
+
+        // === 진단 로그 ===
+        com.example.creator_flow.model.SimulationData D = null;  // import 단축용
+        android.util.Log.d("ProjectPage_AutoFill",
+                "vendorName=" + com.example.creator_flow.model.SimulationData.vendorName
+                + " | platformName=" + com.example.creator_flow.model.SimulationData.platformName
+                + " | quantity=" + com.example.creator_flow.model.SimulationData.quantity
+                + " | platformFee=" + com.example.creator_flow.model.SimulationData.platformFee
+                + " | unitCost=" + com.example.creator_flow.model.SimulationData.unitCost
+                + " | lastResult=" + (com.example.creator_flow.model.SimulationData.lastResult == null ? "null" :
+                    "unitCost=" + com.example.creator_flow.model.SimulationData.lastResult.unitCost
+                    + ", recommended=" + com.example.creator_flow.model.SimulationData.lastResult.recommendedPrice));
+
+        // SimulationData 값들 (시뮬레이션 단계에서 사용자가 고른 것)
+        if (com.example.creator_flow.model.SimulationData.vendorName != null)
+            first.setVendorName(com.example.creator_flow.model.SimulationData.vendorName);
+        if (com.example.creator_flow.model.SimulationData.platformName != null)
+            first.setPlatformName(com.example.creator_flow.model.SimulationData.platformName);
+        if (com.example.creator_flow.model.SimulationData.quantity != null)
+            first.setQuantity(com.example.creator_flow.model.SimulationData.quantity);
+        if (com.example.creator_flow.model.SimulationData.platformFee != null)
+            first.setFeeRate(com.example.creator_flow.model.SimulationData.platformFee);
+        if (com.example.creator_flow.model.SimulationData.targetQuantity != null)
+            first.setTargetQuantity(com.example.creator_flow.model.SimulationData.targetQuantity);
+
+        // 시뮬레이션 응답값 (백엔드 호출 모드일 때)
+        com.example.creator_flow.model.SimulationResultDto r =
+                com.example.creator_flow.model.SimulationData.lastResult;
+        if (r != null) {
+            if (r.unitCost != null) first.setPrice(r.unitCost);
+            if (r.recommendedPrice != null) first.setSellingPrice(r.recommendedPrice);
+        }
+        // 단가 fallback — 백엔드 응답 없을 때 detail1 클라이언트 계산값 사용
+        if (first.getPrice() == 0
+                && com.example.creator_flow.model.SimulationData.unitCost != null) {
+            first.setPrice(com.example.creator_flow.model.SimulationData.unitCost);
+        }
+
+        // 판매가 fallback — 백엔드 recommendedPrice 없을 때 클라이언트 계산
+        // 공식: (단가 + 목표순이익/수량) / (1 - 수수료율/100)  ← 백엔드와 동일 식
+        // 사용자가 profit 입력 안 했으면 0 처리 → 최소 손익분기점 가격
+        if (first.getSellingPrice() == 0 && first.getPrice() > 0) {
+            int unitCost = (int) first.getPrice();
+            double feeRate = first.getFeeRate();    // % (예: 8)
+            Integer profit = com.example.creator_flow.model.SimulationData.profit;
+            int qty = first.getQuantity();
+            double netPerUnit = (profit != null && qty > 0)
+                    ? (profit / (double) qty) : 0;
+            double feeFactor = 1.0 - feeRate / 100.0;
+            if (feeFactor > 0) {
+                int recommended = (int) Math.round((unitCost + netPerUnit) / feeFactor);
+                first.setSellingPrice(recommended);
+            }
+        }
+
+        // 한 번 읽었으니 ProjectPage 보관 필드 모두 비움 — 다음 시뮬레이션 진입 시 잔존 방지
+        com.example.creator_flow.model.SimulationData.profit = null;
+        com.example.creator_flow.model.SimulationData.clearPostNavigation();
+
+        // 첫 차시로 새로 전환 → EditText들 갱신
+        switchChasi(0);
     }
 
     // ── 초기화 메서드 ─────────────────────────────────────────────────────────
@@ -289,6 +409,10 @@ public class ProjectPageFragment extends Fragment {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerCategory.setAdapter(adapter);
 
+        // 드롭다운 폭을 spinner 자체 폭과 동일하게 (post: spinner가 실제 measure된 후 적용)
+        spinnerCategory.post(() ->
+                spinnerCategory.setDropDownWidth(spinnerCategory.getWidth()));
+
         spinnerCategory.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View v, int pos, long id) {
@@ -323,22 +447,30 @@ public class ProjectPageFragment extends Fragment {
             }
         });
 
-        // 날짜 클릭 → DatePickerDialog
+        // 날짜 클릭 → MaterialDatePicker (모던 캘린더 다이얼로그, 라임 테마)
         calender.setOnClickListener(v -> {
-            Calendar cal = Calendar.getInstance();
-            SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy", Locale.ENGLISH);
-            new DatePickerDialog(requireContext(),
-                    (dp, year, month, day) -> {
-                        Calendar sel = Calendar.getInstance();
-                        sel.set(year, month, day);
-                        String dateStr = sdf.format(sel.getTime());
-                        calender.setText(dateStr);
-                        fileList.get(selectedIndex).setDate(dateStr);
-                    },
-                    cal.get(Calendar.YEAR),
-                    cal.get(Calendar.MONTH),
-                    cal.get(Calendar.DAY_OF_MONTH)
-            ).show();
+            com.google.android.material.datepicker.MaterialDatePicker.Builder<Long> builder =
+                    com.google.android.material.datepicker.MaterialDatePicker.Builder.datePicker()
+                            .setTitleText("")   // 좌상단 "날짜 선택" 타이틀 비우기
+                            .setSelection(
+                                    com.google.android.material.datepicker.MaterialDatePicker.todayInUtcMilliseconds())
+                            .setInputMode(
+                                    com.google.android.material.datepicker.MaterialDatePicker.INPUT_MODE_CALENDAR)
+                            .setTheme(R.style.LimeMaterialCalendar);
+
+            com.google.android.material.datepicker.MaterialDatePicker<Long> picker = builder.build();
+
+            picker.addOnPositiveButtonClickListener(selection -> {
+                // selection: UTC milliseconds
+                Calendar sel = Calendar.getInstance();
+                sel.setTimeInMillis(selection);
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy.MM.dd", Locale.KOREAN);
+                String dateStr = sdf.format(sel.getTime());
+                calender.setText(dateStr);
+                fileList.get(selectedIndex).setDate(dateStr);
+            });
+
+            picker.show(getParentFragmentManager(), "date_picker");
         });
 
         // 판매가 입력 감지 → 수익 구조 파이차트 갱신
@@ -368,7 +500,78 @@ public class ProjectPageFragment extends Fragment {
             }
         });
 
-        // 현재/목표 판매량 입력 감지 → 프로그레스바 갱신
+        // 수량 입력 감지 → 현재 차시에 저장 + 백엔드 PUT (debounce) + BEP 차트 갱신
+        etQuantity.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (isSwitching) return;
+                try {
+                    String t = s.toString();
+                    fileList.get(selectedIndex).setQuantity(t.isEmpty() ? 0 : Integer.parseInt(t));
+                    scheduleSaveSimulation(selectedIndex);
+                    updateChart();  // BEP 재계산 (수량 변경)
+                } catch (NumberFormatException ignored) {}
+            }
+        });
+
+        // 판매가 입력 감지 → 현재 차시에 저장 + 백엔드 PUT (debounce) + BEP 차트 갱신
+        // 콤마 포함된 입력도 파싱 가능 ("12,800" → 12800)
+        etRetailPrice.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (isSwitching) return;
+                try {
+                    String t = s.toString().replaceAll(",", "");   // 콤마 제거 후 파싱
+                    fileList.get(selectedIndex).setSellingPrice(t.isEmpty() ? 0 : Integer.parseInt(t));
+                    scheduleSaveSimulation(selectedIndex);
+                    updateChart();  // BEP 재계산 (판매가 변경)
+                } catch (NumberFormatException ignored) {}
+            }
+        });
+
+        // 제작 업체 입력 감지 → 현재 차시에 저장
+        etManufacturer.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (isSwitching) return;
+                fileList.get(selectedIndex).setVendorName(s.toString());
+            }
+        });
+
+        // 판매 업체 입력 감지 → 현재 차시에 저장
+        etSeller.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (isSwitching) return;
+                fileList.get(selectedIndex).setPlatformName(s.toString());
+            }
+        });
+
+        // 판매 수수료 입력 감지 → 현재 차시에 저장 + BEP 차트 갱신
+        // (+ 위 profitChartWatcher가 파이차트도 갱신함)
+        etCommission.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (isSwitching) return;
+                try {
+                    String t = s.toString();
+                    fileList.get(selectedIndex).setFeeRate(t.isEmpty() ? 0 : Double.parseDouble(t));
+                    updateChart();  // BEP 재계산 (수수료 변경)
+                } catch (NumberFormatException ignored) {}
+            }
+        });
+
+        // 현재/목표 판매량 입력 감지 → 프로그레스바 갱신 + 백엔드 PUT (debounce)
         TextWatcher salesWatcher = new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
@@ -386,6 +589,7 @@ public class ProjectPageFragment extends Fragment {
                             targetStr.isEmpty() ? 0 : Integer.parseInt(targetStr));
                 } catch (NumberFormatException ignored) {}
                 updateSalesProgress();
+                scheduleSaveSimulation(selectedIndex);
             }
         };
         etSoldQuantity.addTextChangedListener(salesWatcher);
@@ -518,9 +722,22 @@ public class ProjectPageFragment extends Fragment {
         if (folderImage.getDrawable() != null && folderImage.getTag() instanceof Uri) {
             fileList.get(selectedIndex).setThumbnailUri((Uri) folderImage.getTag());
         }
+        // 현재 차시의 사진 리스트 저장 (불변 복사로 다음 차시 작업 시 간섭 방지)
+        if (selectedIndex >= 0 && selectedIndex < fileList.size()) {
+            ProjectFile prev = fileList.get(selectedIndex);
+            prev.setPhotoUris(new ArrayList<>(photoList));
+            prev.setPhotoImageIds(new ArrayList<>(photoImageIds));
+        }
 
         selectedIndex = index;
         ProjectFile file = fileList.get(index);
+
+        // 새 차시의 사진 리스트 로드
+        photoList.clear();
+        photoImageIds.clear();
+        photoList.addAll(file.getPhotoUris());
+        photoImageIds.addAll(file.getPhotoImageIds());
+        refreshPhotoBox();
 
         // 썸네일 복원
         Uri thumbUri = file.getThumbnailUri();
@@ -528,15 +745,24 @@ public class ProjectPageFragment extends Fragment {
         folderImage.setTag(thumbUri);
 
         // 해당 차시 데이터를 UI에 로드
+        // 큰 숫자(단가/판매가)는 콤마 포맷 (예: 12,800), 수량은 그대로 (작은 숫자)
+        java.text.NumberFormat numFmt = java.text.NumberFormat.getNumberInstance(Locale.KOREA);
         fileName.setText(file.getProjectName() != null ? file.getProjectName() : "");
         calender.setText(file.getDate() != null ? file.getDate() : today());
-        etPrice.setText(file.getPrice() > 0 ? String.valueOf((int) file.getPrice()) : "");
+        etPrice.setText(file.getPrice() > 0 ? numFmt.format((int) file.getPrice()) : "");
         etQuantity.setText(file.getQuantity() > 0 ? String.valueOf(file.getQuantity()) : "");
         etRetailPrice.setText(file.getSellingPrice() > 0
-                ? String.valueOf(file.getSellingPrice()) : "");
+                ? numFmt.format(file.getSellingPrice()) : "");
         etManufacturer.setText(file.getVendorName() != null ? file.getVendorName() : "");
         etSeller.setText(file.getPlatformName() != null ? file.getPlatformName() : "");
-        etCommission.setText(file.getFeeRate() > 0 ? String.valueOf(file.getFeeRate()) : "");
+        // 수수료는 0%여도 표시 (시뮬레이터 통해서 들어오면 0도 정확한 값)
+        // 정수면 "8", 소수면 "5.5" 형식으로 보기 좋게
+        double feeRate = file.getFeeRate();
+        if (feeRate == (int) feeRate) {
+            etCommission.setText(String.valueOf((int) feeRate));
+        } else {
+            etCommission.setText(String.valueOf(feeRate));
+        }
         etSoldQuantity.setText(file.getSoldQuantity() > 0
                 ? String.valueOf(file.getSoldQuantity()) : "");
         etTargetQuantity.setText(file.getTargetQuantity() > 0
@@ -559,8 +785,10 @@ public class ProjectPageFragment extends Fragment {
                 ContextCompat.getColor(requireContext(), colorRes[1])));
 
         isSwitching = false;
-        updateSalesProgress(); // 프로그레스바 갱신
-        refreshTabs(); // 탭 UI 갱신
+        updateSalesProgress(); // 프로그레스바 갱신 (per-차시)
+        updateProfitChart();   // 수익 구조 파이차트 갱신 (per-차시)
+        updateChart();         // 차시별 단가 + BEP 라인차트 갱신
+        refreshTabs();         // 탭 UI 갱신
     }
 
     // ── 탭 UI ─────────────────────────────────────────────────────────────────
@@ -604,13 +832,33 @@ public class ProjectPageFragment extends Fragment {
     // ── 차시 추가 ─────────────────────────────────────────────────────────────
 
     /**
-     * 새 차시를 추가하고 해당 차시로 전환한다.
-     * 차시 번호는 현재 목록 크기 + 1로 자동 부여된다.
+     * 새 차시 추가 — 시뮬레이션 흐름으로 이동.
+     *
+     * 백엔드 POST /simulations는 vendor_product_id, platform_plan_id 등 외래키가 필수라
+     * 사용자가 수동으로 차시 데이터를 입력할 수 없음 → 시뮬레이션 화면 통과 후 자동 생성.
+     *
+     * - projectId 있을 때 (서버 연동 OK): SimulationData.targetProjectId 설정 후 SimulationFragment로 이동.
+     *   시뮬레이션 완료 시 POST /simulations에 project_id=현재 프로젝트 ID 전달되어 차시로 attach됨.
+     * - projectId 없을 때 (로컬 전용): 기존 로직대로 빈 차시 추가.
      */
     private void addChasi() {
-        fileList.add(new ProjectFile(fileList.size() + 1, null, null, today()));
-        switchChasi(fileList.size() - 1);
-        updateChart();
+        if (projectId == null) {
+            // 백엔드 연결 안 됨 → 로컬 빈 차시 추가 (구 동작)
+            fileList.add(new com.example.creator_flow.model.ProjectFile(
+                    fileList.size() + 1, null, null, today()));
+            switchChasi(fileList.size() - 1);
+            updateChart();
+            return;
+        }
+
+        // 백엔드 연결됨: 시뮬레이션 흐름 시작
+        com.example.creator_flow.model.SimulationData.reset();
+        com.example.creator_flow.model.SimulationData.targetProjectId = projectId;
+
+        getParentFragmentManager().beginTransaction()
+                .replace(R.id.main_fragment, new SimulationFragment())
+                .addToBackStack(null)
+                .commit();
     }
 
     // ── 서버 API ──────────────────────────────────────────────────────────────
@@ -649,11 +897,34 @@ public class ProjectPageFragment extends Fragment {
                                         s.createdAt != null ? formatDate(s.createdAt) : today()
                                 );
                                 file.setServerId(s.id);  // simulation id 보관
-                                // 응답에 직접 있는 필드들 우선 채움
+                                // 2026-06 백엔드 업데이트로 응답에 모든 필드 포함됨
+                                // (별도 GET /simulations 호출 불필요)
                                 if (s.quantity != null) file.setQuantity(s.quantity);
-                                if (s.sellingPrice != null) file.setSellingPrice(s.sellingPrice);
                                 if (s.targetQuantity != null) file.setTargetQuantity(s.targetQuantity);
                                 if (s.actualQuantity != null) file.setSoldQuantity(s.actualQuantity);
+                                if (s.unitCost != null) file.setPrice(s.unitCost);
+                                if (s.vendorName != null) file.setVendorName(s.vendorName);
+                                if (s.feeRate != null) file.setFeeRate(s.feeRate);
+
+                                // 판매가: 백엔드 selling_price가 0이면 클라이언트 fallback 계산
+                                // 공식: 단가 / (1 - 수수료율/100)
+                                if (s.sellingPrice != null && s.sellingPrice > 0) {
+                                    file.setSellingPrice(s.sellingPrice);
+                                } else if (s.unitCost != null && s.unitCost > 0) {
+                                    double feeRate = s.feeRate != null ? s.feeRate : 0;
+                                    double feeFactor = 1.0 - feeRate / 100.0;
+                                    if (feeFactor > 0) {
+                                        file.setSellingPrice(
+                                                (int) Math.round(s.unitCost / feeFactor));
+                                    }
+                                }
+
+                                // platform_plan(plan_name) → platform_name 매핑 (매핑 없으면 plan_name 그대로)
+                                if (s.platformPlan != null) {
+                                    String platformName = PLAN_TO_PLATFORM_NAME.getOrDefault(
+                                            s.platformPlan, s.platformPlan);
+                                    file.setPlatformName(platformName);
+                                }
                                 fileList.add(file);
                             }
                         }
@@ -670,22 +941,10 @@ public class ProjectPageFragment extends Fragment {
                             }
                         }
 
-                        // 각 차시의 상세 데이터(vendor_name, unit_cost 등) fetch
-                        for (int i = 0; i < fileList.size(); i++) {
-                            String simId = fileList.get(i).getServerId();
-                            if (simId != null) loadSimulationDetailForChasi(i, simId);
-                        }
-
-                        // 서버 이미지 — 백엔드 응답에 없을 수도 있으니 안전 처리
-                        if (project.images != null) {
-                            photoList.clear();
-                            photoImageIds.clear();
-                            for (ProjectResponse.ProjectImage img : project.images) {
-                                photoList.add(Uri.parse(img.imageUrl));
-                                photoImageIds.add(img.imageId);
-                            }
-                            refreshPhotoBox();
-                        }
+                        // 차시별 이미지 로드 — 2026-06-06 백엔드 추가 엔드포인트.
+                        // simulations[] 처리가 끝나서 각 ProjectFile.serverId가 설정된 상태이므로
+                        // simulation_id 기준으로 정확히 차시 매칭 가능.
+                        loadProjectImages();
                     }
 
                     @Override
@@ -694,6 +953,113 @@ public class ProjectPageFragment extends Fragment {
                             Toast.makeText(requireContext(), "프로젝트 로드 실패", Toast.LENGTH_SHORT).show();
                     }
                 });
+    }
+
+    /**
+     * GET /projects/{id}/images — 프로젝트의 모든 이미지를 받아 차시별로 분배.
+     *
+     * 2026-06-06 백엔드 업데이트로 추가된 엔드포인트. 응답에 simulation_id가 포함되어
+     * 어느 차시에 속한 이미지인지 알 수 있음 → 앱 재시작 후에도 차시별 사진이
+     * 정확히 그 차시로 복원됨.
+     *
+     * 호출 시점: loadProjectFromServer() 안에서 simulations[] 처리 직후
+     * (= 각 ProjectFile.serverId가 설정된 상태여야 매칭 가능).
+     */
+    private void loadProjectImages() {
+        if (projectId == null) return;
+        RetrofitClient.getApi(requireContext())
+                .getProjectImages(projectId, null)  // 전체 이미지 받아오기 (simulation_id 필터 X)
+                .enqueue(new Callback<List<ProjectImageDto>>() {
+                    @Override
+                    public void onResponse(Call<List<ProjectImageDto>> call,
+                                           Response<List<ProjectImageDto>> resp) {
+                        if (!isAdded() || resp.body() == null) return;
+                        distributeImagesToChasi(resp.body());
+                    }
+
+                    @Override
+                    public void onFailure(Call<List<ProjectImageDto>> call, Throwable t) {
+                        // 무시 — 이미지 복원만 안 되고 나머지 데이터는 정상 표시됨
+                        android.util.Log.w("ProjectPage",
+                                "이미지 목록 로드 실패: " + t.getMessage());
+                    }
+                });
+    }
+
+    /**
+     * 받아온 이미지를 simulation_id 기준으로 각 차시의 ProjectFile에 분배.
+     *
+     * - simulation_id가 차시의 serverId와 일치하면 그 차시에 attach.
+     * - simulation_id == null (어느 차시에도 안 묶인 옛날 이미지)이면 1차시에 fallback.
+     * - 매칭되는 차시를 못 찾으면 무시 (해당 차시가 삭제된 경우 등).
+     *
+     * 분배 후 현재 보고 있는 차시(selectedIndex) UI도 즉시 갱신.
+     */
+    private void distributeImagesToChasi(List<ProjectImageDto> images) {
+        // 각 차시의 사진 리스트 초기화 (loadProject로 새로 받은 상태이므로 비어있어야 함)
+        for (ProjectFile f : fileList) {
+            f.setPhotoUris(new ArrayList<>());
+            f.setPhotoImageIds(new ArrayList<>());
+        }
+
+        // simulation_id → 차시 인덱스 매칭
+        for (ProjectImageDto img : images) {
+            if (img == null || img.imageUrl == null) continue;
+
+            int targetIdx = -1;
+            if (img.simulationId != null) {
+                // serverId가 같은 차시 찾기
+                for (int i = 0; i < fileList.size(); i++) {
+                    if (img.simulationId.equals(fileList.get(i).getServerId())) {
+                        targetIdx = i;
+                        break;
+                    }
+                }
+            }
+            // simulation_id null 또는 매칭 실패 → 1차시(첫 번째 차시)로 fallback
+            if (targetIdx < 0 && !fileList.isEmpty()) targetIdx = 0;
+            if (targetIdx < 0) continue;
+
+            ProjectFile target = fileList.get(targetIdx);
+            // 차시당 최대 2개까지만 (refreshPhotoBox의 UI 제약과 일치)
+            if (target.getPhotoUris().size() >= 2) continue;
+
+            String absUrl = toAbsoluteImageUrl(img.imageUrl);
+            android.util.Log.d("ProjectPage",
+                    "image[" + img.id + "] raw=" + img.imageUrl + " → abs=" + absUrl);
+            target.getPhotoUris().add(Uri.parse(absUrl));
+            target.getPhotoImageIds().add(img.id);
+        }
+
+        // 현재 보고 있는 차시의 UI(photoList) 갱신
+        if (selectedIndex >= 0 && selectedIndex < fileList.size()) {
+            ProjectFile current = fileList.get(selectedIndex);
+            photoList.clear();
+            photoImageIds.clear();
+            photoList.addAll(current.getPhotoUris());
+            photoImageIds.addAll(current.getPhotoImageIds());
+            refreshPhotoBox();
+        }
+    }
+
+    /**
+     * 백엔드 imageUrl을 절대 URL로 변환.
+     * - "https://..." / "http://..." → 그대로
+     * - "/uploads/abc.png" → BASE_URL 뒤에 결합 (이중 슬래시 방지)
+     * - "uploads/abc.png" → BASE_URL + "/" + path
+     */
+    private static String toAbsoluteImageUrl(String raw) {
+        if (raw == null) return null;
+        String s = raw.trim();
+        if (s.startsWith("http://") || s.startsWith("https://")) return s;
+        String base = com.example.creator_flow.network.NetworkConfig.BASE_URL;
+        if (base.endsWith("/") && s.startsWith("/")) {
+            return base + s.substring(1);
+        } else if (!base.endsWith("/") && !s.startsWith("/")) {
+            return base + "/" + s;
+        } else {
+            return base + s;
+        }
     }
 
     /**
@@ -741,7 +1107,7 @@ public class ProjectPageFragment extends Fragment {
             java.text.SimpleDateFormat inFmt =
                     new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
             java.util.Date d = inFmt.parse(iso.length() > 19 ? iso.substring(0, 19) : iso);
-            return new java.text.SimpleDateFormat("MMM d, yyyy", Locale.US).format(d);
+            return new java.text.SimpleDateFormat("yyyy.MM.dd", Locale.KOREAN).format(d);
         } catch (Exception e) {
             return iso;
         }
@@ -752,15 +1118,62 @@ public class ProjectPageFragment extends Fragment {
      * 프로젝트명 TextWatcher에서 debounce 없이 호출되므로,
      * 입력이 끝날 때마다 저장된다 (추후 debounce 적용 권장).
      */
+    /**
+     * 차시(simulation) 자동 저장 스케줄링 — debounce 500ms.
+     * 같은 차시에 빠르게 여러 입력이 들어오면 마지막 입력 후 0.5초 뒤에 1번만 PUT.
+     */
+    private void scheduleSaveSimulation(int chasiIndex) {
+        Runnable prev = pendingSimSaves.get(chasiIndex);
+        if (prev != null) debounceHandler.removeCallbacks(prev);
+        Runnable task = () -> saveSimulationToServer(chasiIndex);
+        pendingSimSaves.put(chasiIndex, task);
+        debounceHandler.postDelayed(task, SIM_SAVE_DEBOUNCE_MS);
+    }
+
+    /**
+     * PUT /simulations/{id} — 차시의 quantity / selling_price / actual_quantity /
+     * target_quantity 를 백엔드에 반영.
+     * server_id가 null인 차시(시뮬레이션 안 거치고 수동 추가된 차시)는 skip.
+     */
+    private void saveSimulationToServer(int chasiIndex) {
+        if (!isAdded()) return;
+        if (chasiIndex < 0 || chasiIndex >= fileList.size()) return;
+        ProjectFile file = fileList.get(chasiIndex);
+        String simId = file.getServerId();
+        if (simId == null) return;  // 백엔드에 없는 차시 — 저장 불가
+
+        Integer quantity = file.getQuantity() > 0 ? file.getQuantity() : null;
+        Integer sellingPrice = file.getSellingPrice() > 0 ? file.getSellingPrice() : null;
+        Integer actualQty = file.getSoldQuantity() > 0 ? file.getSoldQuantity() : null;
+        Integer targetQty = file.getTargetQuantity() > 0 ? file.getTargetQuantity() : null;
+
+        RetrofitClient.getApi(requireContext())
+                .updateSimulation(simId, quantity, sellingPrice, actualQty, targetQty)
+                .enqueue(new Callback<SimulationDetailDto>() {
+                    @Override
+                    public void onResponse(Call<SimulationDetailDto> call,
+                                           Response<SimulationDetailDto> resp) {
+                        android.util.Log.d("SimSave",
+                                "차시 " + (chasiIndex+1) + " 저장: HTTP " + resp.code());
+                    }
+                    @Override
+                    public void onFailure(Call<SimulationDetailDto> call, Throwable t) {
+                        android.util.Log.e("SimSave",
+                                "차시 " + (chasiIndex+1) + " 저장 실패: " + t.getMessage());
+                    }
+                });
+    }
+
     private void saveProjectToServer() {
         if (projectId == null) return;
         ProjectFile current = fileList.get(selectedIndex);
-        // 백엔드 PUT /projects/{id}는 name + status 모두 query param으로 요구.
-        // 하나라도 null이면 백엔드가 422 반환하므로 빈 문자열로 대체.
+        // 2026-06 백엔드 업데이트로 다시 JSON body 받음 (Pydantic UpdateProjectRequest).
+        // name + status 모두 필수. null이면 빈 문자열로 대체.
         String name = current.getProjectName() != null ? current.getProjectName() : "";
         String status = current.getCategory() != null ? current.getCategory() : "";
+        UpdateProjectRequest body = new UpdateProjectRequest(name, status);
         RetrofitClient.getApi(requireContext())
-                .updateProject(projectId, name, status)
+                .updateProject(projectId, body)
                 .enqueue(new Callback<ProjectResponse>() {
                     @Override
                     public void onResponse(Call<ProjectResponse> call, Response<ProjectResponse> response) { }
@@ -794,8 +1207,13 @@ public class ProjectPageFragment extends Fragment {
             RequestBody reqBody = RequestBody.create(MediaType.parse("image/*"), tempFile);
             MultipartBody.Part part = MultipartBody.Part.createFormData("image", tempFile.getName(), reqBody);
 
+            // 현재 보고 있는 차시의 simulation_id 같이 보냄 → 차시별 분리 저장
+            // 시뮬레이션 거치지 않고 만든 차시는 serverId가 null → 백엔드에선 차시 미연결로 저장
+            String currentSimId = (selectedIndex >= 0 && selectedIndex < fileList.size())
+                    ? fileList.get(selectedIndex).getServerId() : null;
+
             RetrofitClient.getApi(requireContext())
-                    .uploadImage(projectId, part)
+                    .uploadImage(projectId, part, currentSimId)
                     .enqueue(new Callback<ImageUploadResponse>() {
                         @Override
                         public void onResponse(Call<ImageUploadResponse> call, Response<ImageUploadResponse> response) {
@@ -839,16 +1257,26 @@ public class ProjectPageFragment extends Fragment {
 
     // ── 차트 ──────────────────────────────────────────────────────────────────
 
+    // 단가/BEP 라인 색
+    private static final int COLOR_PRICE = 0xFF7EB4E8;   // 라이트 블루 — 단가
+    private static final int COLOR_BEP   = 0xFF0D47A1;   // 진한 파랑 (Material Blue 900) — 손익분기점
+
     /**
      * LineChart 초기 스타일을 설정한다.
      * 데이터는 updateChart()에서 채운다.
      */
     private void setupChart() {
         chartUnitPrice.setDescription(null);
-        chartUnitPrice.getLegend().setEnabled(false);
+        // 범례 활성화 — 단가/BEP 구분 표시
+        chartUnitPrice.getLegend().setEnabled(true);
+        chartUnitPrice.getLegend().setTextSize(10f);
+        chartUnitPrice.getLegend().setTextColor(0xFF555555);
         chartUnitPrice.setTouchEnabled(false);
         chartUnitPrice.setDrawGridBackground(false);
         chartUnitPrice.setBackgroundColor(Color.TRANSPARENT);
+
+        // 차트 외곽 여백 — 축 라벨이 카드 경계에 묻히지 않게
+        chartUnitPrice.setExtraOffsets(12f, 12f, 12f, 12f);
 
         // X축
         XAxis xAxis = chartUnitPrice.getXAxis();
@@ -857,69 +1285,193 @@ public class ProjectPageFragment extends Fragment {
         xAxis.setTextColor(0xFF888888);
         xAxis.setTextSize(11f);
         xAxis.setGranularity(1f);
+        xAxis.setYOffset(8f);   // 차트 ↔ X축 라벨 사이 여백
 
-        // 왼쪽 Y축
+        // 왼쪽 Y축 — 단가 (₩)
         YAxis leftAxis = chartUnitPrice.getAxisLeft();
         leftAxis.setDrawGridLines(true);
         leftAxis.setGridColor(0xFFDDDDDD);
-        leftAxis.setTextColor(0xFF888888);
+        leftAxis.setTextColor(COLOR_PRICE);
         leftAxis.setTextSize(11f);
         leftAxis.setAxisMinimum(0f);
+        leftAxis.setXOffset(8f);   // 차트 ↔ Y축 라벨 사이 여백
 
-        // 오른쪽 Y축 숨김
-        chartUnitPrice.getAxisRight().setEnabled(false);
+        // 오른쪽 Y축 — 손익분기점 (개)
+        YAxis rightAxis = chartUnitPrice.getAxisRight();
+        rightAxis.setEnabled(true);
+        rightAxis.setDrawGridLines(false);   // 좌축과 격자 충돌 방지
+        rightAxis.setTextColor(COLOR_BEP);
+        rightAxis.setTextSize(11f);
+        rightAxis.setAxisMinimum(0f);
+        rightAxis.setXOffset(8f);   // 차트 ↔ Y축 라벨 사이 여백
 
         updateChart();
     }
 
     /**
-     * 각 차시의 단가 데이터를 읽어 LineChart를 갱신한다.
+     * 차시의 손익분기점(BEP)을 계산.
+     * 공식: 총 제작비 / (판매가 × (1 - 수수료율/100))
+     *  = (단가 × 수량) / (판매가 - 수수료)
+     *
+     * 데이터 부족(수량/판매가 0) 또는 단위 수익 ≤ 0 이면 0 반환 (차트에서 제외).
+     */
+    private int calculateBreakEven(ProjectFile file) {
+        int qty = file.getQuantity();
+        int sellingPrice = file.getSellingPrice();
+        double feeRate = file.getFeeRate();
+        double unitCost = file.getPrice();
+
+        if (qty == 0 || sellingPrice == 0 || unitCost == 0) return 0;
+
+        double totalProductionCost = unitCost * qty;
+        double netPerUnit = sellingPrice * (1.0 - feeRate / 100.0);
+        if (netPerUnit <= 0) return 0;
+
+        return (int) Math.ceil(totalProductionCost / netPerUnit);
+    }
+
+    /**
+     * 각 차시의 단가 + 손익분기점(BEP) 데이터를 읽어 LineChart를 갱신한다.
+     * - 단가: 왼쪽 Y축 (₩ 원)
+     * - 손익분기점: 오른쪽 Y축 (개)
      * 단가가 0인 차시는 제외하고, 최고값 포인트만 레이블을 표시한다.
      */
     private void updateChart() {
-        List<Entry> entries = new ArrayList<>();
+        List<Entry> priceEntries = new ArrayList<>();
+        List<Entry> bepEntries   = new ArrayList<>();
         String[] labels = new String[fileList.size()];
 
         for (int i = 0; i < fileList.size(); i++) {
-            double price = fileList.get(i).getPrice();
-            if (price > 0) entries.add(new Entry(i, (float) price));
-            labels[i] = fileList.get(i).getChasiNumber() + "차";
+            ProjectFile f = fileList.get(i);
+            double price = f.getPrice();
+            if (price > 0) priceEntries.add(new Entry(i, (float) price));
+            int bep = calculateBreakEven(f);
+            if (bep > 0) bepEntries.add(new Entry(i, (float) bep));
+            labels[i] = f.getChasiNumber() + "차";
         }
 
         chartUnitPrice.getXAxis().setValueFormatter(new IndexAxisValueFormatter(labels));
         chartUnitPrice.getXAxis().setLabelCount(fileList.size());
 
-        if (entries.isEmpty()) {
+        // X축 양쪽 여백 — 첫/마지막 점이 Y축(차트 좌·우 경계)에 닿지 않게
+        chartUnitPrice.getXAxis().setAxisMinimum(-0.35f);
+        chartUnitPrice.getXAxis().setAxisMaximum(Math.max(fileList.size() - 1 + 0.35f, 0.7f));
+
+        if (priceEntries.isEmpty() && bepEntries.isEmpty()) {
             chartUnitPrice.clear();
             return;
         }
 
-        // 최고값 계산
-        float maxVal = Float.MIN_VALUE;
-        for (Entry e : entries) if (e.getY() > maxVal) maxVal = e.getY();
-        final float maxValue = maxVal;
+        // ===== 왼쪽 Y축 (단가) 범위 nice-step 계산 =====
+        if (!priceEntries.isEmpty()) {
+            applyNiceAxisRange(chartUnitPrice.getAxisLeft(), priceEntries);
+        }
 
-        LineDataSet dataSet = new LineDataSet(entries, "단가");
-        dataSet.setColor(0xFF7EB4E8);
-        dataSet.setCircleColor(0xFF7EB4E8);
-        dataSet.setCircleRadius(4f);
-        dataSet.setLineWidth(2f);
-        dataSet.setDrawFilled(false);
-        dataSet.setMode(LineDataSet.Mode.LINEAR);
-        dataSet.setDrawValues(true);
+        // ===== 오른쪽 Y축 (BEP) 범위 nice-step 계산 =====
+        if (!bepEntries.isEmpty()) {
+            applyNiceAxisRange(chartUnitPrice.getAxisRight(), bepEntries);
+        }
 
-        // 최고값만 레이블 표시
-        dataSet.setValueFormatter(new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return value == maxValue ? String.valueOf((int) value) : "";
+        // 단가 최댓값 (라벨 표시용)
+        final float priceMaxValue = maxYValue(priceEntries);
+        final float bepMaxValue   = maxYValue(bepEntries);
+
+        // ===== Dataset 1: 단가 (좌축) =====
+        LineDataSet priceDataSet = new LineDataSet(priceEntries, "단가 (원)");
+        priceDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
+        priceDataSet.setColor(COLOR_PRICE);
+        priceDataSet.setCircleColor(COLOR_PRICE);
+        priceDataSet.setCircleRadius(4f);
+        priceDataSet.setLineWidth(2f);
+        priceDataSet.setDrawFilled(false);
+        priceDataSet.setMode(LineDataSet.Mode.LINEAR);
+        priceDataSet.setDrawValues(true);
+        // 단가 라벨은 두 줄 prefix로 점 위쪽 멀리 표시 → BEP 라벨과 세로 분리
+        priceDataSet.setValueFormatter(new ValueFormatter() {
+            @Override public String getFormattedValue(float value) {
+                return value == priceMaxValue ? (int) value + "\n\n" : "";
             }
         });
-        dataSet.setValueTextSize(11f);
-        dataSet.setValueTextColor(Color.BLACK);
+        priceDataSet.setValueTextSize(11f);
+        priceDataSet.setValueTextColor(COLOR_PRICE);
 
-        chartUnitPrice.setData(new LineData(dataSet));
+        // ===== Dataset 2: 손익분기점 (우축) =====
+        LineDataSet bepDataSet = new LineDataSet(bepEntries, "손익분기점 (개)");
+        bepDataSet.setAxisDependency(YAxis.AxisDependency.RIGHT);
+        bepDataSet.setColor(COLOR_BEP);
+        bepDataSet.setCircleColor(COLOR_BEP);
+        bepDataSet.setCircleRadius(4f);
+        bepDataSet.setLineWidth(2f);
+        bepDataSet.setDrawFilled(false);
+        bepDataSet.setMode(LineDataSet.Mode.LINEAR);
+        bepDataSet.setDrawValues(true);
+        // BEP 라벨은 "개" 제거. 점 바로 위(기본 위치). 단가 라벨이 위로 가있어 안 겹침
+        bepDataSet.setValueFormatter(new ValueFormatter() {
+            @Override public String getFormattedValue(float value) {
+                return value == bepMaxValue ? String.valueOf((int) value) : "";
+            }
+        });
+        bepDataSet.setValueTextSize(11f);
+        bepDataSet.setValueTextColor(COLOR_BEP);
+
+        // 두 데이터셋 합쳐서 차트에 세팅
+        LineData data = new LineData();
+        if (!priceEntries.isEmpty()) data.addDataSet(priceDataSet);
+        if (!bepEntries.isEmpty())   data.addDataSet(bepDataSet);
+
+        chartUnitPrice.setData(data);
         chartUnitPrice.invalidate();
+    }
+
+    /** Entry 리스트의 최대 Y값 반환 (빈 리스트면 0) */
+    private float maxYValue(List<Entry> entries) {
+        float max = 0;
+        for (Entry e : entries) if (e.getY() > max) max = e.getY();
+        return max;
+    }
+
+    /**
+     * Y축에 nice step 범위 적용 (250, 500, 1000 같이 깔끔한 라벨).
+     * updateChart() 안에서 좌/우 두 축 공통 사용.
+     */
+    private void applyNiceAxisRange(YAxis axis, List<Entry> entries) {
+        float minVal = Float.MAX_VALUE;
+        float maxVal = Float.MIN_VALUE;
+        for (Entry e : entries) {
+            if (e.getY() < minVal) minVal = e.getY();
+            if (e.getY() > maxVal) maxVal = e.getY();
+        }
+        float dataMin = minVal;
+        float dataMax = maxVal;
+        if (dataMax == dataMin) {
+            float half = Math.max(dataMax * 0.25f, 100f);
+            dataMin -= half;
+            dataMax += half;
+        } else {
+            float pad = (dataMax - dataMin) * 0.25f;
+            dataMin -= pad;
+            dataMax += pad;
+        }
+        float roughStep = (dataMax - dataMin) / 4f;
+        float magnitude = (float) Math.pow(10, Math.floor(Math.log10(roughStep)));
+        float fraction = roughStep / magnitude;
+        float niceFraction;
+        if (fraction <= 1f)        niceFraction = 1f;
+        else if (fraction <= 2f)   niceFraction = 2f;
+        else if (fraction <= 2.5f) niceFraction = 2.5f;
+        else if (fraction <= 5f)   niceFraction = 5f;
+        else                       niceFraction = 10f;
+        float step = niceFraction * magnitude;
+
+        float niceMin = (float) Math.floor(dataMin / step) * step;
+        float niceMax = (float) Math.ceil(dataMax / step) * step;
+        niceMin = Math.max(0f, niceMin);
+
+        axis.setAxisMinimum(niceMin);
+        axis.setAxisMaximum(niceMax);
+        axis.setGranularity(step);
+        int labelCount = (int) Math.round((niceMax - niceMin) / step) + 1;
+        axis.setLabelCount(labelCount, true);
     }
 
     /**
@@ -946,9 +1498,9 @@ public class ProjectPageFragment extends Fragment {
 
         List<PieEntry> entries = new ArrayList<>();
         List<Integer> colors = new ArrayList<>();
-        if (unitCost > 0) { entries.add(new PieEntry(unitCost, "제작 원가")); colors.add(0xFFFF8587); }
-        if (fee > 0)      { entries.add(new PieEntry(fee,      "판매 수수료")); colors.add(0xFFFFC171); }
-        if (profit > 0)   { entries.add(new PieEntry(profit,   "순이익"));    colors.add(0xFF97E1AC); }
+        if (unitCost > 0) { entries.add(new PieEntry(unitCost, "단가"));     colors.add(0xFFB0DBFF); }
+        if (fee > 0)      { entries.add(new PieEntry(fee,      "판매 수수료")); colors.add(0xFF73C0FF); }
+        if (profit > 0)   { entries.add(new PieEntry(profit,   "순이익"));    colors.add(0xFF44ABFF); }
 
         if (entries.isEmpty()) {
             chartProfitStructure.setVisibility(View.GONE);
@@ -975,12 +1527,15 @@ public class ProjectPageFragment extends Fragment {
         chartProfitStructure.setCenterTextSize(13f);
         chartProfitStructure.setCenterTextColor(0xFF444444);
         chartProfitStructure.setDescription(null);
-        chartProfitStructure.setDrawEntryLabels(false); // 슬라이스 위 이름 라벨 숨김
+        // 슬라이스 위에 항목 이름 표시 ("단가" / "순이익" 등)
+        chartProfitStructure.setDrawEntryLabels(true);
+        chartProfitStructure.setEntryLabelColor(0xFF313131);
+        chartProfitStructure.setEntryLabelTextSize(10f);
         chartProfitStructure.setRotationEnabled(false);
         chartProfitStructure.setTouchEnabled(false);
-        chartProfitStructure.getLegend().setEnabled(true);
-        chartProfitStructure.getLegend().setTextColor(0xFF444444);
-        chartProfitStructure.getLegend().setTextSize(11f);
+        // 범례 비활성화 — 슬라이스 자체에 라벨이 있으니 중복 표시 방지
+        // (이전엔 0인 슬라이스는 그려지지 않는데 범례는 남아 보이는 어색함이 있었음)
+        chartProfitStructure.getLegend().setEnabled(false);
         chartProfitStructure.setVisibility(View.VISIBLE);
         chartProfitStructure.invalidate();
     }
@@ -1006,8 +1561,12 @@ public class ProjectPageFragment extends Fragment {
     }
 
     /** 문자열을 float으로 변환한다. 빈 문자열이나 파싱 실패 시 0을 반환한다. */
+    /** 콤마 포맷("3,828") 텍스트도 파싱 가능. 빈/실패 시 0 반환. */
     private float parseFloat(String s) {
-        try { return s == null || s.isEmpty() ? 0f : Float.parseFloat(s); }
+        if (s == null) return 0f;
+        String clean = s.replaceAll(",", "").trim();
+        if (clean.isEmpty()) return 0f;
+        try { return Float.parseFloat(clean); }
         catch (NumberFormatException e) { return 0f; }
     }
 
@@ -1030,7 +1589,7 @@ public class ProjectPageFragment extends Fragment {
 
     /** 오늘 날짜를 "MMM d, yyyy" 형식(영문)으로 반환한다. 예: "May 10, 2026" */
     private String today() {
-        return new SimpleDateFormat("MMM d, yyyy", Locale.ENGLISH)
+        return new SimpleDateFormat("yyyy.MM.dd", Locale.KOREAN)
                 .format(Calendar.getInstance().getTime());
     }
 
@@ -1061,7 +1620,47 @@ public class ProjectPageFragment extends Fragment {
             photoView.setBackground(ContextCompat.getDrawable(
                     requireContext(), R.drawable.project_rounded_solid));
             photoView.setClipToOutline(true);
-            photoView.setImageURI(photoList.get(i));
+            // setImageURI는 content://, file:// 만 지원 — HTTPS URL은 Glide로 로드해야 함
+            // 백엔드 URL(ngrok)은 인증 토큰 + ngrok-skip-browser-warning 헤더 없으면
+            // HTML 경고 페이지 반환되어 이미지 디코드 실패 → 흰 박스로 보임.
+            // 그래서 https/http는 GlideUrl + LazyHeaders로 헤더 첨부, content://·file://는 그대로.
+            Uri photoUri = photoList.get(i);
+            Object loadTarget = photoUri;
+            String scheme = photoUri.getScheme();
+            if (scheme != null && (scheme.equals("https") || scheme.equals("http"))) {
+                String token = TokenManager.getInstance(requireContext()).getToken();
+                if (token == null) token = NetworkConfig.DEV_TOKEN;
+                LazyHeaders.Builder headers = new LazyHeaders.Builder()
+                        .addHeader("ngrok-skip-browser-warning", "true");
+                if (token != null && !token.isEmpty()) {
+                    headers.addHeader("Authorization", "Bearer " + token);
+                }
+                loadTarget = new GlideUrl(photoUri.toString(), headers.build());
+            }
+            final Object finalLoadTarget = loadTarget;
+            Glide.with(requireContext())
+                    .load(loadTarget)
+                    .centerCrop()
+                    .listener(new RequestListener<Drawable>() {
+                        @Override
+                        public boolean onLoadFailed(@androidx.annotation.Nullable GlideException e,
+                                                    Object model, Target<Drawable> target,
+                                                    boolean isFirstResource) {
+                            android.util.Log.e("PhotoLoad",
+                                    "FAILED model=" + finalLoadTarget + ", err=" + e);
+                            if (e != null) e.logRootCauses("PhotoLoad");
+                            return false;  // 기본 처리(error placeholder 등) 그대로
+                        }
+                        @Override
+                        public boolean onResourceReady(Drawable resource, Object model,
+                                                       Target<Drawable> target, DataSource dataSource,
+                                                       boolean isFirstResource) {
+                            android.util.Log.d("PhotoLoad", "OK model=" + finalLoadTarget
+                                    + ", source=" + dataSource);
+                            return false;
+                        }
+                    })
+                    .into(photoView);
 
             final int index = i;
             photoView.setOnClickListener(v -> {

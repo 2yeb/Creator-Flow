@@ -55,7 +55,7 @@ public class SimulationDetail1Fragment extends Fragment {
     public static final String MODEL_FANART = "Fanart";
 
     private static final String CUSTOM_GOODS_TYPE = "직접입력";
-    private static final int[] HAPTIC_POINTS = {10, 30, 50, 100, 150, 200, 250, 300};
+    private static final int[] HAPTIC_POINTS = {10, 30, 50, 100, 150, 200};
 
     /** 굿즈 유형 → 세부 유형 목록 */
     private static final Map<String, List<String>> GOODS_TYPE_TO_SUBTYPES = new LinkedHashMap<>();
@@ -64,6 +64,14 @@ public class SimulationDetail1Fragment extends Fragment {
     /** 전체 업체 목록 */
     private static final List<VendorInfo> ALL_VENDORS;
 
+    static {
+        // ===== Mock 데이터 주석 처리됨 — 백엔드 연결 확인용 (2026-06) =====
+        // API 호출이 실패해도 fallback 안 됨 → 빈 Spinner / 빈 카드로 표시되어
+        // "백엔드 진짜로 연결됐는지" 즉시 알 수 있음.
+        // 시현 시 백엔드 안 되면 모든 화면 비어보임 — 의도된 동작.
+        ALL_VENDORS = java.util.Collections.emptyList();
+    }
+    /*
     static {
         // ============= 굿즈 유형 → 세부 유형 =============
         GOODS_TYPE_TO_SUBTYPES.put("스티커", Arrays.asList("띠부띠부 스티커", "완칼 스티커", "반칼 스티커", "조각 스티커"));
@@ -307,6 +315,8 @@ public class SimulationDetail1Fragment extends Fragment {
                                 .build())
         );
     }
+    */
+    // ===== Mock 주석 끝 =====
 
     // ----- 옵션/케이프 빌더 헬퍼 -----
     private static OptsBuilder opts() { return new OptsBuilder(); }
@@ -438,6 +448,13 @@ public class SimulationDetail1Fragment extends Fragment {
                     SimulationData.quantity = Integer.parseInt(etValue.getText().toString().trim());
                 } catch (NumberFormatException ignored) {}
             }
+        }
+
+        // 단가 commit — 선택된 vendor의 옵션 extra_price 합산값을 SimulationData에 저장.
+        // LOCAL_PROJECT_MODE에서 백엔드 unit_cost를 못 받을 때 ProjectPage 첫 차시 단가로 자동 채움됨.
+        if (confirmedVendorKey != null) {
+            int unitCost = calculateVendorUnitCost(confirmedVendorKey);
+            if (unitCost > 0) SimulationData.unitCost = unitCost;
         }
 
         getParentFragmentManager().beginTransaction()
@@ -577,6 +594,8 @@ public class SimulationDetail1Fragment extends Fragment {
                             vendorNameToId.clear();
                             vendorNameToLogoUrl.clear();
                             for (VendorDto v : resp.body()) {
+                                android.util.Log.d("VendorLogo",
+                                        "API " + v.name + " | logoUrl=" + v.logoUrl);
                                 if (v.name != null && v.id != null) {
                                     vendorNameToId.put(v.name, v.id);
                                     if (v.logoUrl != null && !v.logoUrl.isEmpty()) {
@@ -761,6 +780,76 @@ public class SimulationDetail1Fragment extends Fragment {
     }
 
     /**
+     * vendor의 단가 계산 — 선택된 옵션들의 extra_price 합산.
+     *
+     * 백엔드 vendor_product 자체엔 base_price 컬럼이 없고(VendorProductDto 참고),
+     * 옵션마다 extra_price가 책정돼있어 그 합이 단가가 됨.
+     * 옵션이 다 선택되지 않거나 vendor의 옵션 데이터가 아직 안 들어왔으면 0 반환.
+     *
+     * 주의: 시뮬레이션 실행 후의 백엔드 unit_cost와 다를 수 있음 (백엔드 계산식이
+     * 더 복잡할 가능성). 시현용 "대략 가격 비교" 용도.
+     */
+    private int calculateVendorUnitCost(String vendorName) {
+        List<ProductOptionDto> opts = vendorNameToOptions.get(vendorName);
+        if (opts == null || opts.isEmpty()) return 0;
+        int sum = 0;
+        for (Map.Entry<String, String> sel : selectedOptions.entrySet()) {
+            for (ProductOptionDto opt : opts) {
+                if (sel.getKey().equals(opt.optionName)
+                        && sel.getValue().equals(opt.optionValue)) {
+                    if (opt.extraPrice != null) sum += opt.extraPrice;
+                    break;
+                }
+            }
+        }
+        return sum;
+    }
+
+    /**
+     * 가격에 영향 주는 변경(옵션 / 수량)이 발생하면 호출 — vendor 카드 다시 그리기.
+     * - API 모드: rebuildAndRenderApiVendors()로 단가 재계산까지
+     * - mock 모드: renderVendorCards()만 (mock VendorInfo는 basePrice 캐시 그대로)
+     */
+    private void rerenderVendorCardsForPriceChange() {
+        View root = getView();
+        if (root == null) return;
+        if (!apiVendors.isEmpty()) {
+            rebuildAndRenderApiVendors();
+        } else {
+            renderVendorCards(root);
+        }
+    }
+
+    /**
+     * 옵션 → 값 → extra_price 맵 생성 (바텀시트로 넘김).
+     * 바텀시트에서 칩 변경 시 단가 재계산용.
+     */
+    private Map<String, Map<String, Integer>> buildOptionPriceMap(List<ProductOptionDto> opts) {
+        Map<String, Map<String, Integer>> map = new HashMap<>();
+        if (opts == null) return map;
+        for (ProductOptionDto opt : opts) {
+            if (opt.optionName == null || opt.optionValue == null) continue;
+            int price = opt.extraPrice != null ? opt.extraPrice : 0;
+            map.computeIfAbsent(opt.optionName, k -> new HashMap<>())
+                    .put(opt.optionValue, price);
+        }
+        return map;
+    }
+
+    /** 현재 수량 — EditText 값이 신뢰 가능한 출처 (SimulationData.quantity는 "다음" 누른 후에만 갱신됨) */
+    private int getCurrentQuantity() {
+        View root = getView();
+        if (root == null) return 0;
+        android.widget.EditText etValue = root.findViewById(R.id.tv_quantity_value);
+        if (etValue == null) return 0;
+        try {
+            return Integer.parseInt(etValue.getText().toString().trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
      * vendorNameToId + vendorNameToProduct + vendorNameToOptions 로부터 apiVendors를 재빌드하고
      * 업체 카드 다시 렌더.
      */
@@ -788,16 +877,27 @@ public class SimulationDetail1Fragment extends Fragment {
             int shippingFee = vp.shippingFee != null ? vp.shippingFee : 0;
             boolean freeShipping = vp.freeShippingMin == null && shippingFee == 0;
 
-            VendorInfo info = new VendorInfo(
+            // 단가 = 선택된 옵션들의 extra_price 합산.
+             // 카드에는 총가격(단가 × 수량) 표시 — 사용자의 vendor 비교 직관에 맞춤.
+             // 옵션이 다 안 들어왔을 때는 0 (자동 fallback).
+             int currentQty = getCurrentQuantity();
+             int unitCost = calculateVendorUnitCost(name);
+             int totalCost = unitCost * currentQty;
+
+             VendorInfo info = new VendorInfo(
                     name,
                     pickBrandColor(name),
                     CARD_BG_COLOR,
-                    0,                         // basePrice: POST /simulations 이전엔 모름
+                    totalCost,                 // basePrice 자리: 단가 × 수량
                     shippingFee,
                     freeShipping,
                     capabilities
             );
             info.logoUrl = vendorNameToLogoUrl.get(name);  // 백엔드에서 받은 로고 URL
+            info.productName = vp.name;                    // 상품명 (2026-06-06 백엔드 추가)
+            info.quantity = currentQty;
+            // 옵션별 extra_price 맵 — 바텀시트에서 칩 변경 시 가격 재계산용
+            info.optionPrices = buildOptionPriceMap(opts);
             apiVendors.add(info);
         }
         View root = getView();
@@ -846,7 +946,8 @@ public class SimulationDetail1Fragment extends Fragment {
                 chip.setOnClickListener(v -> {
                     selectedOptions.put(category, value);
                     renderOptionChips(root);
-                    renderVendorCards(root);
+                    // API 모드면 단가 재계산까지 (extra_price 합산이 바뀜)
+                    rerenderVendorCardsForPriceChange();
                 });
                 row.addView(chip);
             }
@@ -967,18 +1068,39 @@ public class SimulationDetail1Fragment extends Fragment {
 
         card.setBackgroundTintList(android.content.res.ColorStateList.valueOf(vendor.cardBgColor));
 
-        // 로고 박스: brandColor를 fallback으로 사용, logoUrl 있으면 Glide로 덮어 그림
+        // 로고 박스: PNG/JPG/WebP만 Glide로 로드. SVG/빈값은 brandColor 박스.
+        // (Glide는 기본적으로 SVG 디코딩 미지원 → 별도 라이브러리 추가 전엔 색 박스로 fallback)
         android.widget.ImageView logoBox = card.findViewById(R.id.vendor_color_box);
-        logoBox.setBackgroundTintList(android.content.res.ColorStateList.valueOf(vendor.brandColor));
-        if (vendor.logoUrl != null && !vendor.logoUrl.isEmpty()) {
+        boolean hasRasterLogo = vendor.logoUrl != null
+                && !vendor.logoUrl.isEmpty()
+                && !vendor.logoUrl.toLowerCase().endsWith(".svg");
+        if (hasRasterLogo) {
+            logoBox.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(Color.WHITE));
+            logoBox.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            logoBox.setPadding(dp(2), dp(2), dp(2), dp(2));
             com.bumptech.glide.Glide.with(this)
                     .load(vendor.logoUrl)
+                    .fitCenter()
                     .into(logoBox);
         } else {
-            logoBox.setImageDrawable(null);  // mock 모드: 이미지 비우고 색 박스만 보임
+            // SVG 또는 빈 URL → brandColor 박스
+            logoBox.setBackgroundTintList(
+                    android.content.res.ColorStateList.valueOf(vendor.brandColor));
+            logoBox.setImageDrawable(null);
         }
 
         ((TextView) card.findViewById(R.id.tv_vendor_name)).setText(vendor.name);
+
+        // 상품명 (백엔드 VendorProduct.name) — 값 있을 때만 표시
+        TextView tvProduct = card.findViewById(R.id.tv_vendor_product);
+        if (vendor.productName != null && !vendor.productName.isEmpty()) {
+            tvProduct.setText(vendor.productName);
+            tvProduct.setVisibility(View.VISIBLE);
+        } else {
+            tvProduct.setVisibility(View.GONE);
+        }
+
         ((TextView) card.findViewById(R.id.tv_vendor_price)).setText(formatPrice(vendor.basePrice));
 
         StringBuilder spec = new StringBuilder();
@@ -1020,13 +1142,22 @@ public class SimulationDetail1Fragment extends Fragment {
                 etValue.setText(String.valueOf(progress));
                 syncing[0] = false;
                 int prev = lastProgress[0];
+                // 큰 마디 — 강한 햅틱 (10, 30, 50, 100, 150, 200 지나갈 때)
+                boolean bigTick = false;
                 for (int point : HAPTIC_POINTS) {
                     if ((prev < point && progress >= point) || (prev > point && progress <= point)) {
                         sb.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                        bigTick = true;
                         break;
                     }
                 }
+                // 5단위 마디 — 약한 햅틱 (큰 마디에서 이미 진동했으면 skip)
+                if (!bigTick && prev / 5 != progress / 5) {
+                    sb.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+                }
                 lastProgress[0] = progress;
+                // 수량 바뀌면 vendor 카드 총가격 갱신 (단가 × 수량) — API 모드도 함께 처리
+                rerenderVendorCardsForPriceChange();
             }
             @Override public void onStartTrackingTouch(SeekBar sb) {}
             @Override public void onStopTrackingTouch(SeekBar sb) {}
@@ -1047,6 +1178,8 @@ public class SimulationDetail1Fragment extends Fragment {
                     seekBar.setProgress(seekValue);
                     syncing[0] = false;
                     lastProgress[0] = seekValue;
+                    // 수량 바뀌면 vendor 카드 총가격 갱신 — API 모드도 함께 처리
+                    rerenderVendorCardsForPriceChange();
                 } catch (NumberFormatException ignored) {}
             }
         });
